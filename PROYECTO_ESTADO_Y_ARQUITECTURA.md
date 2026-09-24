@@ -105,6 +105,13 @@ A continuación se resume la cronología de problemas técnicos enfrentados y la
 * **Causa:** En una conversación oral fluida, un STT fuera de banda con 3 segundos de latencia destruye el orden cronológico y la inmediatez visual.
 * **Solución:** Se revirtió ese enfoque pesado para preservar la velocidad instantánea del sistema.
 
+### Problema 8: Tonos del Sistema en Huawei y Exclusividad de Micrófono en Android/iOS
+* **Síntoma:** En dispositivos Huawei sonaba un tono de inicio y fin (como el botón de micrófono de WhatsApp) cada vez que el usuario intentaba hablar, y no reconocía bien la voz. En Moto G200 no sonaba el tono pero tampoco aparecía la burbuja en el chat.
+* **Causa:** La API `webkitSpeechRecognition` en Android delega en el servicio de dictado por voz del sistema operativo (Google Voice / Huawei Celia). Al activarse, el sistema reproduce un "chime" o pitido por el altavoz y toma el control exclusivo del micrófono, ensordeciendo y cortando las primeras palabras del usuario hacia Gemini Live.
+* **Solución:**
+  1. Se detecta el entorno móvil (`isMobileDevice()`) y se desactiva por completo `SpeechRecognition` en móviles. Esto eliminó de inmediato el molesto tono del sistema en Huawei y devolvió el 100% del ancho de banda y foco del micrófono a la captura Web Audio PCM.
+  2. En el hilo de conversación se captura el evento `voice_committed` que emite el Gateway al detectar el final de cada turno de habla, creando al instante una elegante burbuja de nota de voz estilo WhatsApp con forma de onda animada, duración en segundos, timestamp y checks (`✓✓`). En Desktop (Mac), donde no hay tonos de sistema, se mantiene la transcripción textual continua en vivo.
+
 ---
 
 ## 4. Estructura de Archivos del Proyecto
