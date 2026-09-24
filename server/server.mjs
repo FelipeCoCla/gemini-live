@@ -608,13 +608,6 @@ function pcmToWavBuffer(pcmBuf, sampleRate = 16000) {
         isSpeakingDetected = false;
         speechChunks = [];
         preRollChunks.length = 0;
-        if (clientWs.readyState === WebSocket.OPEN) {
-          clientWs.send(JSON.stringify({
-            type: 'transcript',
-            role: 'user',
-            text: msg.text
-          }));
-        }
         geminiSession.sendUserText(msg.text);
       } else if (msg.type === 'test_inject' && msg.message) {
         geminiSession.injectProactiveTurn(`[MENSAJE DE HERMES]: ${msg.message}. Comunícaselo a Felipe por voz.`);

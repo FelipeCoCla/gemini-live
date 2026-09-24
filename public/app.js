@@ -197,6 +197,10 @@ class VoiceApp {
     }
   }
 
+  isMobileDevice() {
+    return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+  }
+
   appendUserMessage(text, isLive = false) {
     if (!this.chatThread || !text) return null;
 
@@ -407,8 +411,7 @@ class VoiceApp {
     // triggers intrusive system sound effects (WhatsApp-like mic beeps) and seizes
     // exclusive hardware audio, disrupting live Web Audio PCM streaming to Gemini.
     // Desktop (Mac/PC) handles it silently without system beeps.
-    const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-    if (isMobile) {
+    if (this.isMobileDevice()) {
       console.log('[PWA] 📱 Mobile device detected: Disabling client SpeechRecognition to prevent system chime tones and mic conflicts.');
       return;
     }
@@ -527,6 +530,11 @@ class VoiceApp {
       this.activeModelBubble = null;
     }
 
+    if (this.userBubbleFinalizeTimer) {
+      clearTimeout(this.userBubbleFinalizeTimer);
+      this.userBubbleFinalizeTimer = null;
+    }
+
     if (!this.activeUserBubble) {
       this.activeUserBubble = this.appendUserMessage(text, true);
       this.setChatStatus("escuchando...");
@@ -547,7 +555,12 @@ class VoiceApp {
         if (ticks) ticks.style.display = 'inline';
 
         this.lastUserSpokenText = text;
-        this.activeUserBubble = null;
+        
+        // Debounce clearing this.activeUserBubble so multiple isFinal events from Chrome don't duplicate bubbles!
+        if (this.userBubbleFinalizeTimer) clearTimeout(this.userBubbleFinalizeTimer);
+        this.userBubbleFinalizeTimer = setTimeout(() => {
+          this.activeUserBubble = null;
+        }, 1500);
       }
 
       this.setChatStatus("pensando...");
@@ -565,6 +578,7 @@ class VoiceApp {
   sendUserText(text) {
     if (!text || !text.trim()) return;
     const cleanText = text.trim();
+    this.lastUserSpokenText = cleanText;
 
     if (this.finalizeModelBubbleTimer) {
       clearTimeout(this.finalizeModelBubbleTimer);
@@ -919,10 +933,13 @@ class VoiceApp {
             this.activeModelBubble = null;
           }
 
-          // If no client speech recognition bubble is already active with text, create a voice note bubble
-          if (!this.activeUserBubble) {
+          // ONLY on mobile devices (where SpeechRecognition is disabled to avoid OS chimes):
+          // append the WhatsApp voice note bubble.
+          // On Desktop, user input is ALWAYS text (via live SpeechRecognition or input box).
+          // Desktop will NEVER display voice note audio bubbles!
+          if (this.isMobileDevice()) {
             this.appendVoiceNoteMessage(durStr);
-          } else {
+          } else if (this.activeUserBubble) {
             this.activeUserBubble.classList.remove('is-speaking');
             const dot = this.activeUserBubble.querySelector('.bubble-speaking-dot');
             if (dot) dot.remove();
@@ -967,31 +984,22 @@ class VoiceApp {
               this.activeModelBubble = null;
             }
 
-            if (clean !== this.lastUserSpokenText) {
+            // On Desktop: client SpeechRecognition or sendUserText handles user text bubbles directly.
+            // NEVER append duplicate bubbles on Desktop from server transcripts!
+            if (!this.isMobileDevice()) {
               if (this.activeUserBubble) {
                 const textEl = this.activeUserBubble.querySelector('.bubble-text');
-                if (textEl) textEl.textContent = clean;
-                this.activeUserBubble.classList.remove('is-speaking');
-                const dot = this.activeUserBubble.querySelector('.bubble-speaking-dot');
-                if (dot) dot.remove();
-                const time = this.activeUserBubble.querySelector('.bubble-time');
-                if (time) time.textContent = this.getCurrentTime();
-                const ticks = this.activeUserBubble.querySelector('.bubble-ticks');
-                if (ticks) ticks.style.display = 'inline';
-                this.activeUserBubble = null;
-              } else {
-                this.appendUserMessage(clean, false);
+                if (textEl && !textEl.textContent.trim()) {
+                  textEl.textContent = clean;
+                }
               }
+              break;
+            }
+
+            // On Mobile: if a server transcript arrives, display it
+            if (clean !== this.lastUserSpokenText) {
+              this.appendUserMessage(clean, false);
               this.lastUserSpokenText = clean;
-            } else if (this.activeUserBubble) {
-              this.activeUserBubble.classList.remove('is-speaking');
-              const dot = this.activeUserBubble.querySelector('.bubble-speaking-dot');
-              if (dot) dot.remove();
-              const time = this.activeUserBubble.querySelector('.bubble-time');
-              if (time) time.textContent = this.getCurrentTime();
-              const ticks = this.activeUserBubble.querySelector('.bubble-ticks');
-              if (ticks) ticks.style.display = 'inline';
-              this.activeUserBubble = null;
             }
             this.setChatStatus("pensando...");
           } else if (msg.role === 'model' && msg.text) {
@@ -1003,6 +1011,22 @@ class VoiceApp {
             if (this.finalizeModelBubbleTimer) {
               clearTimeout(this.finalizeModelBubbleTimer);
               this.finalizeModelBubbleTimer = null;
+            }
+
+            // Lock and close active user bubble immediately once model starts streaming
+            if (this.userBubbleFinalizeTimer) {
+              clearTimeout(this.userBubbleFinalizeTimer);
+              this.userBubbleFinalizeTimer = null;
+            }
+            if (this.activeUserBubble) {
+              this.activeUserBubble.classList.remove('is-speaking');
+              const dot = this.activeUserBubble.querySelector('.bubble-speaking-dot');
+              if (dot) dot.remove();
+              const time = this.activeUserBubble.querySelector('.bubble-time');
+              if (time) time.textContent = this.getCurrentTime();
+              const ticks = this.activeUserBubble.querySelector('.bubble-ticks');
+              if (ticks) ticks.style.display = 'inline';
+              this.activeUserBubble = null;
             }
 
             if (!this.activeModelBubble) {
