@@ -87,7 +87,7 @@ export class GlowingOrb {
 
   setCompact(isCompact) {
     this.isCompact = isCompact;
-    this.targetCenterY = isCompact ? 0.105 : 0.5;
+    this.targetCenterY = isCompact ? 0.095 : 0.5;
     this.targetScale = isCompact ? 0.42 : 1.0;
   }
 
