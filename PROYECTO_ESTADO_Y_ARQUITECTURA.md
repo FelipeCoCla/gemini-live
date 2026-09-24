@@ -39,7 +39,7 @@ Google AI Studio Bidi     http://192.168.31.20    Puerto 3443 para móviles
    * **`app.js`:** Controlador Web Audio API. Captura micrófono a 16 kHz mono con anti-aliasing filter, y reproduce audio de Gemini a 24 kHz mono con encolado preciso (`AudioBufferSourceNode`) para evitar cortes o chasquidos.
    * **`audio-recorder-worklet.js`:** Procesador en AudioWorklet para muestreo eficiente a 16 kHz, con fallback automático a `ScriptProcessorNode` en navegadores antiguos.
 2. **Backend Gateway (`server/server.mjs`):**
-   * Servidor dual HTTP (puerto 3000) y Polyglot HTTPS/TLS (puerto 3443).
+   * Servidor dual HTTP (puerto 4040) y Polyglot HTTPS/TLS (puerto 3443).
    * WebSocket Server (`/ws`) que gestiona el puente entre cliente y Gemini Live.
    * VAD (Voice Activity Detection) por RMS con ventana de pre-roll (~320 ms) para asegurar que el inicio de cada palabra se preserve intacto.
 3. **Módulo Gemini Live (`server/gemini-live.mjs`):**
@@ -137,7 +137,7 @@ gemini-live/
 
 ### Variables de Entorno (`.env`)
 ```bash
-PORT=3000
+PORT=4040
 GEMINI_API_KEY=tu_api_key_de_google_ai_studio
 GEMINI_MODEL=models/gemini-3.8-live
 GEMINI_VOICE=Aoede
@@ -154,7 +154,7 @@ npm run dev
 ```
 
 ### Acceso
-* **Local (Desktop):** `http://localhost:3000`
+* **Local (Desktop):** `http://localhost:4040`
 * **Celulares en LAN (HTTPS obligatorio para micrófono):** `https://192.168.31.191:3443`
 
 ---

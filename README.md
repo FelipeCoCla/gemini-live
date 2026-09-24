@@ -46,7 +46,7 @@ cp .env.example .env
 ```
 Edita `.env`:
 ```env
-PORT=3000
+PORT=4040
 GEMINI_API_KEY=tu_api_key_aqui
 GEMINI_MODEL=models/gemini-3.8-live
 GEMINI_VOICE=Aoede
@@ -63,7 +63,7 @@ npm start
 ```
 
 ### 4. Acceder a la Interfaz
-- **Desktop (Localhost):** [http://localhost:3000](http://localhost:3000)
+- **Desktop (Localhost):** [http://localhost:4040](http://localhost:4040)
 - **Dispositivos Móviles (Misma Red Wi-Fi):** `https://<TU_IP_LOCAL>:3443` *(Requiere aceptar certificado SSL auto-firmado)*
 
 ---

@@ -2,10 +2,10 @@
  * Test Gateway Audio Streaming from a client
  */
 
-const ws = new WebSocket('ws://localhost:3000/ws');
+const ws = new WebSocket('ws://localhost:4040/ws');
 
 ws.addEventListener('open', () => {
-  console.log('✅ Client connected to ws://localhost:3000/ws');
+  console.log('✅ Client connected to ws://localhost:4040/ws');
 });
 
 ws.addEventListener('message', (event) => {

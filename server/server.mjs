@@ -23,7 +23,7 @@ const RECORDINGS_DIR = path.join(__dirname, '..', 'recordings');
 if (!fs.existsSync(RECORDINGS_DIR)) {
   fs.mkdirSync(RECORDINGS_DIR, { recursive: true });
 }
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 4040;
 
 const MIME_TYPES = {
   '.html': 'text/html; charset=UTF-8',

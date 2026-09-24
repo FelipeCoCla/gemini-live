@@ -3,7 +3,7 @@ import { WebSocket } from 'ws';
 
 console.log('Testing Audio VAD Turn 1 and Turn 2 via Gateway...');
 
-const ws = new WebSocket('ws://localhost:3000/ws');
+const ws = new WebSocket('ws://localhost:4040/ws');
 const wavBuffer = fs.readFileSync('/tmp/speech.wav');
 const pcmBuffer = wavBuffer.subarray(44);
 

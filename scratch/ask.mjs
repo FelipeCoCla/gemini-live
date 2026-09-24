@@ -17,7 +17,7 @@ const prompt = process.argv.slice(2).join(' ').trim() || 'Hola Gemini, que dia e
 console.log(`\n🌙 [Modo Silencioso / Terminal] Preguntando a Gemini:`);
 console.log(`💬 "${prompt}"\n`);
 
-const ws = new WebSocket('ws://localhost:3000/ws');
+const ws = new WebSocket('ws://localhost:4040/ws');
 const audioChunks = [];
 let answerStarted = false;
 

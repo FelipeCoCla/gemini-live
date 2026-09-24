@@ -2,7 +2,7 @@ import fs from 'fs';
 
 console.log('Testing VAD End-to-End through Gateway...');
 
-const ws = new WebSocket('ws://localhost:3000/ws');
+const ws = new WebSocket('ws://localhost:4040/ws');
 const wavBuffer = fs.readFileSync('/tmp/speech.wav');
 const pcmBuffer = wavBuffer.subarray(44);
 

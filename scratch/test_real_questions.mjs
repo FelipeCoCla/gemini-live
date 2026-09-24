@@ -3,7 +3,7 @@ import { WebSocket } from 'ws';
 
 console.log('Testing Real Audio Questions through Gateway...');
 
-const ws = new WebSocket('ws://localhost:3000/ws');
+const ws = new WebSocket('ws://localhost:4040/ws');
 
 const q1Buffer = fs.readFileSync('/tmp/question1.wav').subarray(44);
 const q2Buffer = fs.readFileSync('/tmp/question2.wav').subarray(44);
