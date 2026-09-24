@@ -204,6 +204,26 @@ class VoiceApp {
   appendUserMessage(text, isLive = false) {
     if (!this.chatThread || !text) return null;
 
+    // Strict UI anti-duplicate guard:
+    // If the last child row in chatThread is already a user bubble with identical text, reuse it!
+    const lastRow = this.chatThread.lastElementChild;
+    if (lastRow && lastRow.classList.contains('user-row')) {
+      const lastTextEl = lastRow.querySelector('.bubble-text');
+      if (lastTextEl && lastTextEl.textContent.trim().toLowerCase() === text.trim().toLowerCase()) {
+        const bubble = lastRow.querySelector('.chat-bubble');
+        if (!isLive && bubble) {
+          bubble.classList.remove('is-speaking');
+          const dot = bubble.querySelector('.bubble-speaking-dot');
+          if (dot) dot.remove();
+          const ticks = bubble.querySelector('.bubble-ticks');
+          if (ticks) ticks.style.display = 'inline';
+          const time = bubble.querySelector('.bubble-time');
+          if (time && time.textContent === 'hablando...') time.textContent = this.getCurrentTime();
+        }
+        return bubble;
+      }
+    }
+
     const row = document.createElement('div');
     row.className = 'chat-bubble-row user-row';
 
@@ -533,6 +553,14 @@ class VoiceApp {
     if (this.userBubbleFinalizeTimer) {
       clearTimeout(this.userBubbleFinalizeTimer);
       this.userBubbleFinalizeTimer = null;
+    }
+
+    // DEDUPLICATION GUARD:
+    // If no bubble is active, but the user text matches what was just finalized or spoken,
+    // do not create a duplicate bubble.
+    if (!this.activeUserBubble && this.lastUserSpokenText && text.trim().toLowerCase() === this.lastUserSpokenText.trim().toLowerCase()) {
+      console.log(`[PWA] 🛡️ Suppressed duplicate user speech bubble: "${text}"`);
+      return;
     }
 
     if (!this.activeUserBubble) {
@@ -940,6 +968,7 @@ class VoiceApp {
           if (this.isMobileDevice()) {
             this.appendVoiceNoteMessage(durStr);
           } else if (this.activeUserBubble) {
+            // Keep the activeUserBubble reference so Chrome's subsequent isFinal doesn't duplicate it!
             this.activeUserBubble.classList.remove('is-speaking');
             const dot = this.activeUserBubble.querySelector('.bubble-speaking-dot');
             if (dot) dot.remove();
@@ -947,7 +976,6 @@ class VoiceApp {
             if (time) time.textContent = this.getCurrentTime();
             const ticks = this.activeUserBubble.querySelector('.bubble-ticks');
             if (ticks) ticks.style.display = 'inline';
-            this.activeUserBubble = null;
           }
           this.setChatStatus("pensando...");
           this.setStatus("Pensando...", "thinking");
@@ -996,8 +1024,8 @@ class VoiceApp {
               break;
             }
 
-            // On Mobile: if a server transcript arrives, display it
-            if (clean !== this.lastUserSpokenText) {
+            // On Mobile: if a server transcript arrives, display it (if not duplicate)
+            if (clean.trim().toLowerCase() !== (this.lastUserSpokenText || '').trim().toLowerCase()) {
               this.appendUserMessage(clean, false);
               this.lastUserSpokenText = clean;
             }

@@ -108,6 +108,13 @@ export class GeminiLiveSession {
       try {
         const text = data.toString();
         const msg = JSON.parse(text);
+        if (msg.error) {
+          console.error('[GeminiLive] ❌ API Error from Gemini:', JSON.stringify(msg.error));
+          this.isGenerating = false;
+          this.isSpeaking = false;
+          if (this.onError) this.onError(new Error(msg.error.message || 'Gemini Live API error'));
+          return;
+        }
         if (msg.serverContent) {
           console.log('[GeminiLive] 📩 serverContent:', Object.keys(msg.serverContent).join(', '));
         }
@@ -277,7 +284,7 @@ export class GeminiLiveSession {
         }
       }
 
-      if (turnComplete) {
+      if (turnComplete || msg.serverContent.generationComplete) {
         this.isGenerating = false;
         // Do not immediately drop isSpeaking while audio may still be playing
         if (!this.isSpeaking && this.onStateChange) {

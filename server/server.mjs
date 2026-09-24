@@ -393,9 +393,18 @@ function handleWsConnection(clientWs, req) {
   const clientIp = req.socket.remoteAddress;
   console.log(`[Gateway] 📱 PWA client connected from ${clientIp}`);
 
+  let isTurnPending = false;
+  let responseFallbackTimer = null;
+  let lastClientTranscript = null;
+
   // Create Gemini Live bridge session for this client
   const geminiSession = new GeminiLiveSession({
     onAudioOutput: (base64Pcm24k) => {
+      isTurnPending = false;
+      if (responseFallbackTimer) {
+        clearTimeout(responseFallbackTimer);
+        responseFallbackTimer = null;
+      }
       if (clientWs.readyState === WebSocket.OPEN) {
         clientWs.send(JSON.stringify({
           type: 'audio',
@@ -404,6 +413,13 @@ function handleWsConnection(clientWs, req) {
       }
     },
     onStateChange: (state, metadata) => {
+      if (state === 'speaking') {
+        isTurnPending = false;
+        if (responseFallbackTimer) {
+          clearTimeout(responseFallbackTimer);
+          responseFallbackTimer = null;
+        }
+      }
       if (clientWs.readyState === WebSocket.OPEN) {
         clientWs.send(JSON.stringify({
           type: 'state',
@@ -413,6 +429,11 @@ function handleWsConnection(clientWs, req) {
       }
     },
     onInterrupted: () => {
+      isTurnPending = false;
+      if (responseFallbackTimer) {
+        clearTimeout(responseFallbackTimer);
+        responseFallbackTimer = null;
+      }
       if (clientWs.readyState === WebSocket.OPEN) {
         clientWs.send(JSON.stringify({
           type: 'interrupted'
@@ -420,6 +441,13 @@ function handleWsConnection(clientWs, req) {
       }
     },
     onTranscript: (role, text) => {
+      if (role === 'model') {
+        isTurnPending = false;
+        if (responseFallbackTimer) {
+          clearTimeout(responseFallbackTimer);
+          responseFallbackTimer = null;
+        }
+      }
       if (clientWs.readyState === WebSocket.OPEN) {
         clientWs.send(JSON.stringify({
           type: 'transcript',
@@ -429,6 +457,11 @@ function handleWsConnection(clientWs, req) {
       }
     },
     onError: (err) => {
+      isTurnPending = false;
+      if (responseFallbackTimer) {
+        clearTimeout(responseFallbackTimer);
+        responseFallbackTimer = null;
+      }
       if (clientWs.readyState === WebSocket.OPEN) {
         clientWs.send(JSON.stringify({
           type: 'error',
@@ -505,6 +538,7 @@ function pcmToWavBuffer(pcmBuf, sampleRate = 16000) {
         speechChunks = [];
         preRollChunks.length = 0;
         consecutiveSpeech = 0;
+        isTurnPending = true;
         geminiSession.sendUserAudio(msg.data, msg.mimeType || 'audio/wav');
       } else if (msg.type === 'audio' && msg.data) {
         chunkCount++;
@@ -516,19 +550,29 @@ function pcmToWavBuffer(pcmBuf, sampleRate = 16000) {
         }
         const rms = Math.sqrt(sum / int16.length);
 
-        // Echo suppression: strictly drop audio when client is playing sound or model is speaking,
-        // unless user performs intentional loud barge-in (RMS > 950)
-        if ((isClientPlayingAudio || geminiSession.isSpeaking) && rms < 950) {
+        // 1. Connection warm-up: ignore first 8 chunks (~500ms) to filter out
+        // hardware mic initialization pops/clicks that spike to high RMS
+        if (chunkCount <= 8) {
+          preRollChunks.push(buf);
+          if (preRollChunks.length > PRE_ROLL_LIMIT) preRollChunks.shift();
           return;
         }
 
-        // Voice threshold: 310 RMS firmly ignores ambient room noise, fan, and breathing
-        const VOICE_THRESHOLD = 310;
+        // 2. Turn-in-flight collision & echo suppression:
+        // - Block audio when client is playing speaker sound or model is speaking, unless intentional loud barge-in (RMS > 1100)
+        // - Block low/medium noise while an audio turn is currently waiting for Gemini Live response so in-flight turn is never aborted!
+        if ((isTurnPending || isClientPlayingAudio || geminiSession.isSpeaking) && rms < 1100) {
+          return;
+        }
+
+        // Voice threshold: 360 RMS firmly ignores ambient room noise, fan, and breathing
+        const VOICE_THRESHOLD = 360;
+        const CONSECUTIVE_REQUIRED = 4; // ~256ms of continuous speech
 
         if (!isSpeakingDetected) {
           if (rms > VOICE_THRESHOLD) {
             consecutiveSpeech++;
-            if (consecutiveSpeech >= 3) {
+            if (consecutiveSpeech >= CONSECUTIVE_REQUIRED) {
               isSpeakingDetected = true;
               speechChunks = [...preRollChunks, buf];
               preRollChunks.length = 0;
@@ -555,7 +599,7 @@ function pcmToWavBuffer(pcmBuf, sampleRate = 16000) {
             // User paused: start silence detection timeout
             if (!silenceTimer) {
               silenceTimer = setTimeout(() => {
-                // Ensure at least ~770ms (12 chunks) of real voice was spoken
+                // Ensure at least ~640ms (10 chunks) of real voice was spoken
                 if (speechChunks.length >= 10) {
                   const pcmData = Buffer.concat(speechChunks);
                   const wavData = pcmToWavBuffer(pcmData, 16000);
@@ -567,7 +611,20 @@ function pcmToWavBuffer(pcmBuf, sampleRate = 16000) {
                       durationSec: duration
                     }));
                   }
+                  isTurnPending = true;
                   geminiSession.sendUserAudio(wavData.toString('base64'), 'audio/wav');
+
+                  // 3.5s Watchdog Fallback:
+                  // If Gemini Live does not answer the audio turn within 3.5s (e.g. ambient noise false-alarm or clipped audio),
+                  // and we have a high-confidence transcript from client speech recognition, recover immediately via text!
+                  if (responseFallbackTimer) clearTimeout(responseFallbackTimer);
+                  responseFallbackTimer = setTimeout(() => {
+                    if (isTurnPending && lastClientTranscript && !geminiSession.isSpeaking) {
+                      console.log(`[Gateway] ⏱️ Gemini Live audio turn was silent/unanswered after 3.5s. Rescuing turn with client transcript: "${lastClientTranscript}"`);
+                      isTurnPending = true;
+                      geminiSession.sendUserText(lastClientTranscript);
+                    }
+                  }, 3500);
                 } else {
                   console.log(`[Gateway] ✂️ Discarding brief acoustic noise (${speechChunks.length} chunks)`);
                 }
@@ -589,15 +646,16 @@ function pcmToWavBuffer(pcmBuf, sampleRate = 16000) {
           const pcmData = Buffer.concat(speechChunks);
           const wavData = pcmToWavBuffer(pcmData, 16000);
           console.log(`[Gateway] 🏁 turn_complete: Committing ${pcmData.length} bytes to Gemini Live...`);
+          isTurnPending = true;
           geminiSession.sendUserAudio(wavData.toString('base64'), 'audio/wav');
         } else {
           geminiSession.signalTurnComplete();
         }
         speechChunks = [];
         isSpeakingDetected = false;
-        speechChunks = [];
-        isSpeakingDetected = false;
+        consecutiveSpeech = 0;
       } else if (msg.type === 'user_speech_transcript' && msg.text) {
+        lastClientTranscript = msg.text.trim();
         if (geminiSession.isEchoOfModel(msg.text)) {
           console.log(`[Gateway] 🛡️ Ignored client speech transcript echo of model: "${msg.text}"`);
         } else {
@@ -605,9 +663,12 @@ function pcmToWavBuffer(pcmBuf, sampleRate = 16000) {
         }
       } else if (msg.type === 'user_text' && msg.text) {
         if (silenceTimer) clearTimeout(silenceTimer);
+        if (responseFallbackTimer) clearTimeout(responseFallbackTimer);
         isSpeakingDetected = false;
         speechChunks = [];
         preRollChunks.length = 0;
+        consecutiveSpeech = 0;
+        isTurnPending = true;
         geminiSession.sendUserText(msg.text);
       } else if (msg.type === 'test_inject' && msg.message) {
         geminiSession.injectProactiveTurn(`[MENSAJE DE HERMES]: ${msg.message}. Comunícaselo a Felipe por voz.`);
@@ -619,6 +680,7 @@ function pcmToWavBuffer(pcmBuf, sampleRate = 16000) {
 
   clientWs.on('close', () => {
     if (silenceTimer) clearTimeout(silenceTimer);
+    if (responseFallbackTimer) clearTimeout(responseFallbackTimer);
     console.log('[Gateway] 📱 PWA client disconnected');
     geminiSession.close();
     activeSessions.delete(clientWs);
