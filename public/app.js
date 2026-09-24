@@ -371,7 +371,10 @@ class VoiceApp {
 
     try {
       if (this.recognition) {
-        try { this.recognition.abort(); } catch (e) {}
+        try {
+          this.recognition.onend = null;
+          this.recognition.abort();
+        } catch (e) {}
       }
 
       this.recognition = new SpeechRec();
@@ -384,12 +387,8 @@ class VoiceApp {
       };
 
       this.recognition.onresult = (event) => {
-        // Drop recognition immediately if Gemini is playing audio or recognition is paused
+        // Drop recognition immediately if Gemini is playing audio or recognition is gated
         if (this.isPlayingAudio || !this.isRecognitionAllowed) {
-          if (this.activeUserBubble && this.activeUserBubble.classList.contains('is-speaking')) {
-            this.activeUserBubble.closest('.chat-bubble-row')?.remove();
-            this.activeUserBubble = null;
-          }
           return;
         }
 
@@ -412,10 +411,6 @@ class VoiceApp {
         // Anti-echo guard: Drop if matches model output
         if (this.isEchoOfModel(currentText)) {
           console.warn(`[PWA] 🛡️ Ignored SpeechRecognition echo of model: "${currentText}"`);
-          if (this.activeUserBubble && this.activeUserBubble.classList.contains('is-speaking')) {
-            this.activeUserBubble.closest('.chat-bubble-row')?.remove();
-            this.activeUserBubble = null;
-          }
           return;
         }
 
@@ -424,20 +419,36 @@ class VoiceApp {
 
       this.recognition.onerror = (e) => {
         console.warn('[PWA] SpeechRecognition error:', e.error);
+        if (e.error === 'not-allowed' || e.error === 'service-not-allowed') {
+          this.recognition = null;
+        }
       };
 
       this.recognition.onend = () => {
-        if (this.isConnected && this.isRecognitionAllowed && !this.isPlayingAudio) {
-          try {
-            this.recognition.start();
-          } catch (e) {}
+        if (this.isConnected) {
+          setTimeout(() => {
+            if (this.isConnected) {
+              try {
+                this.recognition?.start();
+              } catch (e) {
+                // If instance failed or already started, re-setup cleanly
+                if (e.name !== 'InvalidStateError') {
+                  this.setupSpeechRecognition();
+                }
+              }
+            }
+          }, 250);
         }
       };
 
       this.isRecognitionAllowed = true;
-      this.recognition.start();
+      try {
+        this.recognition.start();
+      } catch (err) {
+        console.warn('[PWA] Delayed recognition start:', err.message);
+      }
     } catch (err) {
-      console.warn('[PWA] Could not start SpeechRecognition:', err.message);
+      console.warn('[PWA] Could not initialize SpeechRecognition:', err.message);
     }
   }
 
@@ -855,6 +866,20 @@ class VoiceApp {
               break;
             }
 
+            // Finalize previous model bubble if open
+            if (this.finalizeModelBubbleTimer) {
+              clearTimeout(this.finalizeModelBubbleTimer);
+              this.finalizeModelBubbleTimer = null;
+            }
+            if (this.activeModelBubble) {
+              this.activeModelBubble.classList.remove('is-streaming');
+              const dot = this.activeModelBubble.querySelector('.bubble-speaking-dot');
+              if (dot) dot.remove();
+              const time = this.activeModelBubble.querySelector('.bubble-time');
+              if (time) time.textContent = this.getCurrentTime();
+              this.activeModelBubble = null;
+            }
+
             if (clean !== this.lastUserSpokenText) {
               if (this.activeUserBubble) {
                 const textEl = this.activeUserBubble.querySelector('.bubble-text');
@@ -871,7 +896,17 @@ class VoiceApp {
                 this.appendUserMessage(clean, false);
               }
               this.lastUserSpokenText = clean;
+            } else if (this.activeUserBubble) {
+              this.activeUserBubble.classList.remove('is-speaking');
+              const dot = this.activeUserBubble.querySelector('.bubble-speaking-dot');
+              if (dot) dot.remove();
+              const time = this.activeUserBubble.querySelector('.bubble-time');
+              if (time) time.textContent = this.getCurrentTime();
+              const ticks = this.activeUserBubble.querySelector('.bubble-ticks');
+              if (ticks) ticks.style.display = 'inline';
+              this.activeUserBubble = null;
             }
+            this.setChatStatus("pensando...");
           } else if (msg.role === 'model' && msg.text) {
             const clean = this.cleanTranscript(msg.text);
             if (!clean) break;
@@ -924,13 +959,8 @@ class VoiceApp {
 
     if (!this.isPlayingAudio) {
       this.isPlayingAudio = true;
-      // HARD ABORT on SpeechRecognition: immediately stop listening and purge recognition pipeline!
+      // Gate recognition without calling abort() so the native recognition engine stays alive
       this.isRecognitionAllowed = false;
-      if (this.recognition) {
-        try {
-          this.recognition.abort();
-        } catch (e) {}
-      }
 
       // Purge any lingering user bubble that was open right as audio started
       if (this.activeUserBubble && this.activeUserBubble.classList.contains('is-speaking')) {
@@ -1018,10 +1048,14 @@ class VoiceApp {
 
               // Allow speech recognition immediately
               this.isRecognitionAllowed = true;
-              if (this.isConnected && this.recognition) {
+              if (this.isConnected) {
                 try {
-                  this.recognition.start();
-                } catch (e) {}
+                  this.recognition?.start();
+                } catch (e) {
+                  if (e.name !== 'InvalidStateError') {
+                    this.setupSpeechRecognition();
+                  }
+                }
               }
             }
           }, 200);

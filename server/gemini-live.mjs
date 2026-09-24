@@ -146,6 +146,8 @@ export class GeminiLiveSession {
             }
           }
         },
+        inputAudioTranscription: {},
+        outputAudioTranscription: {},
         systemInstruction: {
           parts: [{ text: SYSTEM_PROMPT }]
         },
@@ -202,8 +204,22 @@ export class GeminiLiveSession {
         return stripped;
       };
 
-      if (msg.serverContent.inputTranscription?.text) {
-        const cleanUser = filterNonSpeechTokens(msg.serverContent.inputTranscription.text);
+      const extractText = (val) => {
+        if (!val) return '';
+        if (typeof val === 'string') return val;
+        if (typeof val.text === 'string') return val.text;
+        if (Array.isArray(val.parts)) {
+          return val.parts.map(p => p.text || '').join('');
+        }
+        return '';
+      };
+
+      // Native Gemini Live user speech transcription
+      const rawUserText = extractText(msg.serverContent.inputTranscription) || 
+                          extractText(msg.serverContent.interimInputTranscription) ||
+                          extractText(msg.serverContent.userTurn);
+      if (rawUserText) {
+        const cleanUser = filterNonSpeechTokens(rawUserText);
         if (cleanUser && !this.isEchoOfModel(cleanUser)) {
           console.log(`[GeminiLive] 👤 Usuario: "${cleanUser}"`);
           if (this.onTranscript) {
@@ -215,8 +231,9 @@ export class GeminiLiveSession {
       }
 
       let outputTranscribed = false;
-      if (msg.serverContent.outputTranscription?.text) {
-        const cleanModel = filterNonSpeechTokens(msg.serverContent.outputTranscription.text);
+      const rawModelText = extractText(msg.serverContent.outputTranscription);
+      if (rawModelText) {
+        const cleanModel = filterNonSpeechTokens(rawModelText);
         if (cleanModel) {
           console.log(`[GeminiLive] 🗣️ Gemini: "${cleanModel}"`);
           this.recentModelTexts.push(cleanModel);
