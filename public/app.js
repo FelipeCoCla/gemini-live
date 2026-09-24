@@ -239,6 +239,46 @@ class VoiceApp {
     return bubble;
   }
 
+  appendVoiceNoteMessage(durationStr) {
+    if (!this.chatThread) return null;
+
+    const row = document.createElement('div');
+    row.className = 'chat-bubble-row user-row';
+
+    const bubble = document.createElement('div');
+    bubble.className = 'chat-bubble user-bubble voice-note-bubble';
+
+    const content = document.createElement('div');
+    content.className = 'bubble-voice-content';
+    content.innerHTML = `
+      <div class="voice-mic-icon">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"></path>
+          <path d="M19 10v2a7 7 0 0 1-14 0v-2"></path>
+          <line x1="12" y1="19" x2="12" y2="22"></line>
+        </svg>
+      </div>
+      <div class="voice-bars">
+        <span class="vbar"></span><span class="vbar"></span><span class="vbar"></span><span class="vbar"></span><span class="vbar"></span><span class="vbar"></span>
+      </div>
+      <span class="voice-dur">${durationStr}</span>
+    `;
+    bubble.appendChild(content);
+
+    const meta = document.createElement('div');
+    meta.className = 'bubble-meta';
+    meta.innerHTML = `
+      <span class="bubble-time">${this.getCurrentTime()}</span>
+      <span class="bubble-ticks" style="display: inline;">✓✓</span>
+    `;
+    bubble.appendChild(meta);
+
+    row.appendChild(bubble);
+    this.chatThread.appendChild(row);
+    this.scrollToBottom();
+    return bubble;
+  }
+
   appendModelMessage(text, isLive = false) {
     if (!this.chatThread) return null;
 
@@ -363,6 +403,16 @@ class VoiceApp {
   }
 
   setupSpeechRecognition() {
+    // CRITICAL: On mobile devices (Android / Huawei / iOS), native Web SpeechRecognition
+    // triggers intrusive system sound effects (WhatsApp-like mic beeps) and seizes
+    // exclusive hardware audio, disrupting live Web Audio PCM streaming to Gemini.
+    // Desktop (Mac/PC) handles it silently without system beeps.
+    const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+    if (isMobile) {
+      console.log('[PWA] 📱 Mobile device detected: Disabling client SpeechRecognition to prevent system chime tones and mic conflicts.');
+      return;
+    }
+
     const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (!SpeechRec) {
       console.warn('[PWA] SpeechRecognition not natively available on this browser');
@@ -849,6 +899,43 @@ class VoiceApp {
           this.setChatStatus("escuchando...");
           this.setStatus("Escuchando...", "listening");
           break;
+
+        case 'voice_committed': {
+          const duration = parseFloat(msg.durationSec) || 0;
+          const durStr = duration > 0 ? `${duration.toFixed(1)}s` : 'audio';
+          console.log(`[PWA] 🎙️ Voice turn committed (${durStr})`);
+
+          // Finalize previous model bubble if open
+          if (this.finalizeModelBubbleTimer) {
+            clearTimeout(this.finalizeModelBubbleTimer);
+            this.finalizeModelBubbleTimer = null;
+          }
+          if (this.activeModelBubble) {
+            this.activeModelBubble.classList.remove('is-streaming');
+            const dot = this.activeModelBubble.querySelector('.bubble-speaking-dot');
+            if (dot) dot.remove();
+            const time = this.activeModelBubble.querySelector('.bubble-time');
+            if (time) time.textContent = this.getCurrentTime();
+            this.activeModelBubble = null;
+          }
+
+          // If no client speech recognition bubble is already active with text, create a voice note bubble
+          if (!this.activeUserBubble) {
+            this.appendVoiceNoteMessage(durStr);
+          } else {
+            this.activeUserBubble.classList.remove('is-speaking');
+            const dot = this.activeUserBubble.querySelector('.bubble-speaking-dot');
+            if (dot) dot.remove();
+            const time = this.activeUserBubble.querySelector('.bubble-time');
+            if (time) time.textContent = this.getCurrentTime();
+            const ticks = this.activeUserBubble.querySelector('.bubble-ticks');
+            if (ticks) ticks.style.display = 'inline';
+            this.activeUserBubble = null;
+          }
+          this.setChatStatus("pensando...");
+          this.setStatus("Pensando...", "thinking");
+          break;
+        }
 
         case 'transcript':
           console.log(`[Transcript] ${msg.role}: ${msg.text}`);

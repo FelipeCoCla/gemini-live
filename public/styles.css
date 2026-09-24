@@ -651,6 +651,64 @@ html, body {
   50% { border-color: rgba(56, 189, 248, 0.85); box-shadow: 0 0 18px rgba(56, 189, 248, 0.45); }
 }
 
+/* Voice Note Bubble in WhatsApp Thread */
+.voice-note-bubble {
+  min-width: 160px;
+}
+
+.bubble-voice-content {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 4px 2px 2px 2px;
+}
+
+.voice-mic-icon {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.16);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #38bdf8;
+  flex-shrink: 0;
+}
+
+.voice-bars {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  height: 16px;
+  flex-grow: 1;
+}
+
+.voice-bars .vbar {
+  width: 3px;
+  background: rgba(255, 255, 255, 0.75);
+  border-radius: 2px;
+  animation: vbarAnim 1.2s infinite ease-in-out;
+}
+
+.voice-bars .vbar:nth-child(1) { height: 6px; animation-delay: 0.1s; }
+.voice-bars .vbar:nth-child(2) { height: 14px; animation-delay: 0.25s; }
+.voice-bars .vbar:nth-child(3) { height: 10px; animation-delay: 0.4s; }
+.voice-bars .vbar:nth-child(4) { height: 15px; animation-delay: 0.15s; }
+.voice-bars .vbar:nth-child(5) { height: 8px; animation-delay: 0.35s; }
+.voice-bars .vbar:nth-child(6) { height: 12px; animation-delay: 0.2s; }
+
+@keyframes vbarAnim {
+  0%, 100% { transform: scaleY(0.7); opacity: 0.6; }
+  50% { transform: scaleY(1.15); opacity: 1; }
+}
+
+.voice-dur {
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: #bae6fd;
+  white-space: nowrap;
+}
+
 /* Model Bubble (WhatsApp Dark Glass / Obsidian) */
 .model-bubble {
   background: rgba(32, 44, 51, 0.95);
