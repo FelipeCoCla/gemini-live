@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="theme-color" content="#0d0f12">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="description" content="Interfaz de voz manos libres minimalista con Gemini 3.8 Live y orquestador Hermes">
+  <title>Gemini Live • Voice Interface</title>
+
+  <!-- PWA Manifest & Favicon -->
+  <link rel="manifest" href="manifest.json">
+  <link rel="icon" type="image/svg+xml" href="icons/icon.svg">
+  <link rel="apple-touch-icon" href="icons/icon-192.png">
+
+  <!-- Typography -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600&display=swap" rel="stylesheet">
+
+  <link rel="stylesheet" href="styles.css?v=21">
+</head>
+<body>
+  <main id="app-container" data-state="idle" role="button" aria-label="Toca la pantalla para activar o desactivar la interfaz de voz" tabindex="0">
+    <!-- Insecure Context Notice for Mobile HTTP -->
+    <aside id="https-banner" class="https-mobile-notice" style="display: none;">
+      <div class="notice-content">
+        <span class="notice-icon">🔒</span>
+        <span class="notice-text">Micrófono requiere HTTPS en móvil.</span>
+        <a id="btn-orb-switch-https" href="#" class="notice-action">Usar HTTPS</a>
+      </div>
+    </aside>
+
+    <!-- Centered Siri / Gemini Canvas Orb -->
+    <div class="orb-wrapper" id="orb-wrapper">
+      <canvas id="orb-canvas"></canvas>
+    </div>
+
+    <!-- Minimalist Status Feedback (idle only) -->
+    <div class="status-wrapper" id="idle-status-wrapper">
+      <p id="status-text" class="status-text">Toca para hablar</p>
+      <div class="pulse-indicator"></div>
+    </div>
+
+    <!-- WhatsApp-style Conversational Panel (Occupies ~75% of screen when active) -->
+    <section id="conversation-panel" class="conversation-panel" aria-live="polite">
+      <!-- WhatsApp Header -->
+      <header class="chat-header">
+        <div class="chat-contact-wrap">
+          <div class="chat-avatar">
+            <div class="avatar-inner">
+              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
+              </svg>
+            </div>
+            <span class="avatar-status-dot"></span>
+          </div>
+          <div class="chat-contact-info">
+            <span class="chat-contact-name">Gemini 3.8 Live</span>
+            <span id="chat-contact-status" class="chat-contact-status">en línea</span>
+          </div>
+        </div>
+
+        <div class="chat-header-actions">
+          <button type="button" id="panel-disconnect-btn" class="chat-btn-disconnect" title="Cerrar llamada" aria-label="Finalizar llamada">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <line x1="18" y1="6" x2="6" y2="18"></line>
+              <line x1="6" y1="6" x2="18" y2="18"></line>
+            </svg>
+            <span>Finalizar</span>
+          </button>
+        </div>
+      </header>
+
+      <!-- Continuous Chat Thread / Message Feed -->
+      <div class="chat-thread" id="chat-thread">
+        <div class="chat-encryption-notice">
+          <span class="notice-lock">🔒</span>
+          <span>Conversación continua de voz en directo con Gemini 3.8 y Hermes</span>
+        </div>
+
+        <!-- Initial welcome / hint bubble from Gemini -->
+        <div class="chat-bubble-row model-row">
+          <div class="chat-bubble model-bubble">
+            <div class="bubble-sender">Gemini 3.8</div>
+            <div class="bubble-text">Hola Felipe, estoy conectado y escuchándote en directo. Puedes hablarme con libertad o escribir lo que necesites.</div>
+            <div class="bubble-meta">
+              <span class="bubble-time" id="initial-welcome-time">En vivo</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- WhatsApp-style Footer / Input -->
+      <footer class="chat-footer">
+        <form id="quick-text-form" class="chat-input-form">
+          <input type="text" id="quick-text-input" class="chat-input" placeholder="Escribe un mensaje o habla..." autocomplete="off">
+          <button type="submit" id="quick-text-submit" class="chat-send-btn" title="Enviar mensaje">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+              <line x1="22" y1="2" x2="11" y2="13"></line>
+              <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+            </svg>
+          </button>
+        </form>
+      </footer>
+    </section>
+
+    <!-- Discrete Hermes Proactive Injection Trigger (Test Tool) -->
+    <button id="debug-trigger" class="discrete-btn" title="Simular inyección de Hermes" aria-label="Abrir panel de prueba de Hermes">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="12" cy="12" r="3"></circle>
+        <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+      </svg>
+    </button>
+
+    <!-- Discrete Slide-out Test Drawer -->
+    <aside id="debug-drawer" class="debug-drawer" aria-hidden="true">
+      <div class="drawer-header">
+        <h3>Herramientas & Diagnóstico</h3>
+        <button id="close-drawer" class="icon-close-btn" aria-label="Cerrar panel">&times;</button>
+      </div>
+
+      <div style="margin: 10px 0 16px 0;">
+        <a href="/grabar" style="text-decoration:none; text-align:center; display:flex; align-items:center; justify-content:center; gap:8px; background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%); color:#fff; font-weight:600; padding:12px 14px; border-radius:10px; font-size:0.9rem; box-shadow:0 4px 14px rgba(239,68,68,0.3);">
+          <span>🎙️</span>
+          <span>Diagnóstico de Micrófono & Voz Real</span>
+        </a>
+      </div>
+
+      <div style="height: 1px; background: rgba(56, 189, 248, 0.15); margin: 14px 0;"></div>
+
+      <div class="drawer-header">
+        <h3>🌙 Modo Silencioso (TTS)</h3>
+      </div>
+      <p class="drawer-desc">Escribe lo que quieres preguntarle a Gemini sin usar tu voz. El sistema generará audio en 16kHz y Gemini te responderá por voz.</p>
+      <div class="drawer-form">
+        <label for="tts-input-text">Pregunta para Gemini:</label>
+        <textarea id="tts-input-text" rows="2" placeholder="Ej: Hola Gemini, ¿qué hora es? o Hermes, revisa los cambios de git"></textarea>
+        <button id="tts-speak-btn" class="drawer-submit-btn" style="background: linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%);">🗣️ Enviar por voz TTS</button>
+      </div>
+
+      <div style="height: 1px; background: rgba(56, 189, 248, 0.15); margin: 18px 0 14px 0;"></div>
+
+      <div class="drawer-header">
+        <h3>Hermes Orchestrator Loop</h3>
+      </div>
+      <p class="drawer-desc">Dispara una inyección proactiva de Hermes en la llamada de Gemini para verificar la interacción por voz.</p>
+      <div class="drawer-form">
+        <label for="custom-inject-text">Mensaje de Hermes para el usuario:</label>
+        <textarea id="custom-inject-text" rows="2">Hermes necesita saber si creamos una rama nueva en Git o usamos main.</textarea>
+        <button id="test-inject-btn" class="drawer-submit-btn">Vocalizar a través de Gemini</button>
+      </div>
+      <div class="drawer-info">
+        <p><strong>Bunker local:</strong> <code>192.168.31.20:8642</code></p>
+        <p><strong>Modelo Live:</strong> <code>gemini-3.8-live</code></p>
+      </div>
+    </aside>
+  </main>
+
+  <script type="module" src="app.js?v=21"></script>
+</body>
+</html>

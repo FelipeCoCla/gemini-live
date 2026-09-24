@@ -1,0 +1,44 @@
+{
+  "name": "Gemini Live • Voice Interface",
+  "short_name": "Gemini Live",
+  "description": "Minimalist hands-free Voice Interface with Gemini 3.8 Live & Hermes Orchestrator",
+  "start_url": "/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#0d0f12",
+  "theme_color": "#0d0f12",
+  "icons": [
+    {
+      "src": "icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "icons/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Hablar directamente",
+      "short_name": "Hablar",
+      "description": "Inicia la interfaz de voz manos libres automáticamente",
+      "url": "/?auto=true",
+      "icons": [
+        {
+          "src": "icons/icon-192.png",
+          "sizes": "192x192"
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,16 @@
+{
+  "name": "gemini-live-pwa",
+  "version": "1.0.0",
+  "description": "Minimalist hands-free Voice Interface PWA with Gemini 3.8 Live and Hermes Orchestrator Bridge",
+  "type": "module",
+  "main": "server/server.mjs",
+  "scripts": {
+    "start": "node server/server.mjs",
+    "dev": "node --watch server/server.mjs"
+  },
+  "dependencies": {
+    "dotenv": "^16.4.7",
+    "ws": "^8.18.0"
+  },
+  "devDependencies": {}
+}
