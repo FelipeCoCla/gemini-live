@@ -116,7 +116,7 @@ export class SoundManager {
   // CORE HELPER: Pure warm sine bowl generator
   // (Identical synthesis engine to playZenStop)
   // ==========================================
-  playBowlTone(ctx, now, freq, dur = 0.8, peak = 0.25, delay = 0, masterVol = 0.48) {
+  playBowlTone(ctx, now, freq, dur = 0.8, peak = 0.65, delay = 0, masterVol = 0.85) {
     const masterGain = ctx.createGain();
     masterGain.gain.setValueAtTime(masterVol, now);
     masterGain.connect(ctx.destination);
@@ -140,53 +140,53 @@ export class SoundManager {
   // 1. ZEN ELEGIDO (ON: 329Hz Base / OFF: 220Hz Zen 4)
   // ==========================================
   playZenOriginalStart(ctx, now) {
-    this.playBowlTone(ctx, now, 329.63, 0.8, 0.25, 0, 0.48);
+    this.playBowlTone(ctx, now, 329.63, 0.8, 0.65, 0, 0.85);
   }
   playZenOriginalStop(ctx, now) {
-    // Exacto Zen 4 OFF: La3 grave (220Hz), 1.05s, 0.28 peak, 0.54 vol
-    this.playBowlTone(ctx, now, 220.00, 1.05, 0.28, 0, 0.54);
+    // Exacto Zen 4 OFF: La3 grave (220Hz), 1.05s, 0.70 peak, 0.90 vol
+    this.playBowlTone(ctx, now, 220.00, 1.05, 0.70, 0, 0.90);
   }
 
   // ==========================================
   // ZEN BASE FIJO (E4 329Hz en ambos)
   // ==========================================
   playZenPureStart(ctx, now) {
-    this.playBowlTone(ctx, now, 329.63, 0.8, 0.25, 0, 0.48);
+    this.playBowlTone(ctx, now, 329.63, 0.8, 0.65, 0, 0.85);
   }
   playZenPureStop(ctx, now) {
-    this.playBowlTone(ctx, now, 329.63, 0.8, 0.25, 0, 0.48);
+    this.playBowlTone(ctx, now, 329.63, 0.8, 0.65, 0, 0.85);
   }
 
   // ==========================================
   // 2. ZEN ARMÓNICO (Quinta: La4 -> Mi4)
   // ==========================================
   playZenHarmonicStart(ctx, now) {
-    this.playBowlTone(ctx, now, 440.00, 0.75, 0.24, 0, 0.48);
+    this.playBowlTone(ctx, now, 440.00, 0.75, 0.62, 0, 0.85);
   }
   playZenHarmonicStop(ctx, now) {
-    this.playBowlTone(ctx, now, 329.63, 0.85, 0.25, 0, 0.48);
+    this.playBowlTone(ctx, now, 329.63, 0.85, 0.65, 0, 0.85);
   }
 
   // ==========================================
   // 3. ZEN DÚO (Doble Gota Mi ➔ Sol#)
   // ==========================================
   playZenDuoStart(ctx, now) {
-    this.playBowlTone(ctx, now, 329.63, 0.6, 0.22, 0.00, 0.48);
-    this.playBowlTone(ctx, now, 415.30, 0.7, 0.24, 0.09, 0.48);
+    this.playBowlTone(ctx, now, 329.63, 0.6, 0.58, 0.00, 0.85);
+    this.playBowlTone(ctx, now, 415.30, 0.7, 0.62, 0.09, 0.85);
   }
   playZenDuoStop(ctx, now) {
-    this.playBowlTone(ctx, now, 415.30, 0.6, 0.22, 0.00, 0.48);
-    this.playBowlTone(ctx, now, 329.63, 0.75, 0.24, 0.09, 0.48);
+    this.playBowlTone(ctx, now, 415.30, 0.6, 0.58, 0.00, 0.85);
+    this.playBowlTone(ctx, now, 329.63, 0.75, 0.62, 0.09, 0.85);
   }
 
   // ==========================================
   // 4. ZEN PROFUNDO (Sub / Grave: 277Hz / 220Hz)
   // ==========================================
   playZenDeepStart(ctx, now) {
-    this.playBowlTone(ctx, now, 277.18, 0.9, 0.26, 0, 0.54);
+    this.playBowlTone(ctx, now, 277.18, 0.9, 0.68, 0, 0.90);
   }
   playZenDeepStop(ctx, now) {
-    this.playBowlTone(ctx, now, 220.00, 1.05, 0.28, 0, 0.54);
+    this.playBowlTone(ctx, now, 220.00, 1.05, 0.70, 0, 0.90);
   }
 
   // ==========================================
@@ -194,22 +194,22 @@ export class SoundManager {
   // ==========================================
   playZenShimmerStart(ctx, now) {
     // Fundamental
-    this.playBowlTone(ctx, now, 329.63, 0.8, 0.25, 0, 0.48);
+    this.playBowlTone(ctx, now, 329.63, 0.8, 0.65, 0, 0.85);
     // Subtle higher octave shimmer at low volume
-    this.playBowlTone(ctx, now, 659.25, 0.6, 0.10, 0.02, 0.48);
+    this.playBowlTone(ctx, now, 659.25, 0.6, 0.18, 0.02, 0.85);
   }
   playZenShimmerStop(ctx, now) {
-    this.playBowlTone(ctx, now, 329.63, 0.8, 0.25, 0, 0.48);
+    this.playBowlTone(ctx, now, 329.63, 0.8, 0.65, 0, 0.85);
   }
 
   // ==========================================
   // 6. ZEN RESONANCIA LARGA (1.4s)
   // ==========================================
   playZenResonanceStart(ctx, now) {
-    this.playBowlTone(ctx, now, 329.63, 1.2, 0.25, 0, 0.48);
+    this.playBowlTone(ctx, now, 329.63, 1.2, 0.65, 0, 0.85);
   }
   playZenResonanceStop(ctx, now) {
-    this.playBowlTone(ctx, now, 329.63, 1.4, 0.25, 0, 0.48);
+    this.playBowlTone(ctx, now, 329.63, 1.4, 0.65, 0, 0.85);
   }
 
   // ==========================================
@@ -217,7 +217,7 @@ export class SoundManager {
   // ==========================================
   playQuantumStart(ctx, now) {
     const masterGain = ctx.createGain();
-    masterGain.gain.setValueAtTime(0.40, now);
+    masterGain.gain.setValueAtTime(0.80, now);
     masterGain.connect(ctx.destination);
 
     const sweep = ctx.createOscillator();
@@ -227,7 +227,7 @@ export class SoundManager {
     sweep.frequency.exponentialRampToValueAtTime(1100, now + 0.09);
 
     sweepGain.gain.setValueAtTime(0.0001, now);
-    sweepGain.gain.exponentialRampToValueAtTime(0.25, now + 0.03);
+    sweepGain.gain.exponentialRampToValueAtTime(0.55, now + 0.03);
     sweepGain.gain.exponentialRampToValueAtTime(0.0001, now + 0.14);
 
     sweep.connect(sweepGain);
@@ -241,7 +241,7 @@ export class SoundManager {
     ping.frequency.setValueAtTime(1760, now + 0.08);
 
     pingGain.gain.setValueAtTime(0.0001, now + 0.08);
-    pingGain.gain.exponentialRampToValueAtTime(0.20, now + 0.09);
+    pingGain.gain.exponentialRampToValueAtTime(0.50, now + 0.09);
     pingGain.gain.exponentialRampToValueAtTime(0.0001, now + 0.7);
 
     ping.connect(pingGain);
@@ -252,7 +252,7 @@ export class SoundManager {
 
   playQuantumStop(ctx, now) {
     const masterGain = ctx.createGain();
-    masterGain.gain.setValueAtTime(0.40, now);
+    masterGain.gain.setValueAtTime(0.80, now);
     masterGain.connect(ctx.destination);
 
     const sweep = ctx.createOscillator();
@@ -262,7 +262,7 @@ export class SoundManager {
     sweep.frequency.exponentialRampToValueAtTime(320, now + 0.15);
 
     sweepGain.gain.setValueAtTime(0.0001, now);
-    sweepGain.gain.exponentialRampToValueAtTime(0.26, now + 0.02);
+    sweepGain.gain.exponentialRampToValueAtTime(0.60, now + 0.02);
     sweepGain.gain.exponentialRampToValueAtTime(0.0001, now + 0.22);
 
     sweep.connect(sweepGain);
@@ -276,7 +276,7 @@ export class SoundManager {
   // ==========================================
   playAppleStart(ctx, now) {
     const masterGain = ctx.createGain();
-    masterGain.gain.setValueAtTime(0.45, now);
+    masterGain.gain.setValueAtTime(0.85, now);
     masterGain.connect(ctx.destination);
 
     const tones = [
@@ -291,7 +291,7 @@ export class SoundManager {
       osc.frequency.setValueAtTime(f, now + delay);
 
       gain.gain.setValueAtTime(0.0001, now + delay);
-      gain.gain.exponentialRampToValueAtTime(0.35, now + delay + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.65, now + delay + 0.02);
       gain.gain.exponentialRampToValueAtTime(0.0001, now + delay + dur);
 
       osc.connect(gain);
@@ -303,7 +303,7 @@ export class SoundManager {
 
   playAppleStop(ctx, now) {
     const masterGain = ctx.createGain();
-    masterGain.gain.setValueAtTime(0.40, now);
+    masterGain.gain.setValueAtTime(0.80, now);
     masterGain.connect(ctx.destination);
 
     const tones = [
@@ -318,7 +318,7 @@ export class SoundManager {
       osc.frequency.setValueAtTime(f, now + delay);
 
       gain.gain.setValueAtTime(0.0001, now + delay);
-      gain.gain.exponentialRampToValueAtTime(0.30, now + delay + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.60, now + delay + 0.02);
       gain.gain.exponentialRampToValueAtTime(0.0001, now + delay + dur);
 
       osc.connect(gain);
