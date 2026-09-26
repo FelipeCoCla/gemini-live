@@ -1071,56 +1071,67 @@ class VoiceApp {
               break;
             }
 
-            // Finalize previous model bubble if open
-            if (this.finalizeModelBubbleTimer) {
-              clearTimeout(this.finalizeModelBubbleTimer);
-              this.finalizeModelBubbleTimer = null;
-            }
-            if (this.activeModelBubble) {
-              this.activeModelBubble.classList.remove('is-streaming');
-              const dot = this.activeModelBubble.querySelector('.bubble-speaking-dot');
-              if (dot) dot.remove();
-              const time = this.activeModelBubble.querySelector('.bubble-time');
-              if (time) time.textContent = this.getCurrentTime();
-              this.activeModelBubble = null;
+            // CRITICAL: DO NOT finalize this.activeModelBubble here!
+            // Gemini Live might be actively streaming speech; closing it splits its response into multiple textboxes!
+
+            // 1. If we have an active voice note bubble waiting to be morphed (e.g. Android):
+            if (this.lastVoiceNoteBubble && document.body.contains(this.lastVoiceNoteBubble)) {
+              console.log(`[PWA] 🔄 Morphing voice note audio bubble into text: "${clean}"`);
+              this.morphVoiceBubbleToText(this.lastVoiceNoteBubble, clean);
+              this.lastVoiceNoteBubble = null;
+              break;
             }
 
-            // Locate the user's current bubble to upgrade or morph it
-            const lastUserRow = this.chatThread.querySelector('.user-row:last-of-type');
-            const targetBubble = this.lastVoiceNoteBubble || 
-                                 this.activeUserBubble || 
-                                 (lastUserRow ? lastUserRow.querySelector('.chat-bubble') : null);
+            // 2. Locate the existing user bubble for this turn:
+            const userBubbles = this.chatThread.querySelectorAll('.user-bubble');
+            const lastUserBubble = userBubbles.length > 0 ? userBubbles[userBubbles.length - 1] : null;
 
-            if (targetBubble) {
-              if (targetBubble.classList.contains('voice-note-bubble')) {
-                // On Mobile: Replace the voice note audio bubble with the exact transcribed text!
+            if (lastUserBubble) {
+              if (lastUserBubble.classList.contains('voice-note-bubble')) {
                 console.log(`[PWA] 🔄 Morphing voice note audio bubble into text: "${clean}"`);
-                this.morphVoiceBubbleToText(targetBubble, clean);
+                this.morphVoiceBubbleToText(lastUserBubble, clean);
               } else {
-                // On Desktop: upgrade truncated text to Gemini's full transcription
-                const textEl = targetBubble.querySelector('.bubble-text');
-                if (textEl) {
-                  if (textEl.textContent.trim() !== clean) {
-                    console.log(`[PWA] ✨ Upgraded user bubble from "${textEl.textContent}" to full transcript: "${clean}"`);
-                    textEl.textContent = clean;
-                  }
-                  targetBubble.classList.remove('is-speaking');
-                  const dot = targetBubble.querySelector('.bubble-speaking-dot');
-                  if (dot) dot.remove();
-                  const time = targetBubble.querySelector('.bubble-time');
-                  if (time && time.textContent === 'hablando...') time.textContent = this.getCurrentTime();
-                  const ticks = targetBubble.querySelector('.bubble-ticks');
-                  if (ticks) ticks.style.display = 'inline';
+                const textEl = lastUserBubble.querySelector('.bubble-text');
+                const existingText = textEl ? textEl.textContent.trim() : '';
+                // Only upgrade if the user bubble was empty or a tiny stub (< 6 chars)
+                if (!existingText || existingText.length < 6) {
+                  console.log(`[PWA] ✨ Upgraded user bubble from "${existingText}" to: "${clean}"`);
+                  if (textEl) textEl.textContent = clean;
+                  this.lastUserSpokenText = clean;
+                } else {
+                  console.log(`[PWA] 🛡️ Preserved existing user text ("${existingText}"); ignored server transcript ("${clean}")`);
                 }
-                this.activeUserBubble = null;
               }
-              this.lastUserSpokenText = clean;
-            } else {
-              this.appendUserMessage(clean, false);
-              this.lastUserSpokenText = clean;
+              // Do NOT create a duplicate user bubble!
+              break;
             }
 
-            this.setChatStatus("pensando...");
+            // 3. Fallback: if no user bubble existed at all, insert it BEFORE the model row
+            // so the user's prompt is ALWAYS on top of Gemini's response!
+            const newRow = document.createElement('div');
+            newRow.className = 'chat-bubble-row user-row';
+            const newBubble = document.createElement('div');
+            newBubble.className = 'chat-bubble user-bubble';
+            newBubble.innerHTML = `
+              <div class="bubble-text">${clean}</div>
+              <div class="bubble-meta">
+                <span class="bubble-time">${this.getCurrentTime()}</span>
+                <span class="bubble-ticks" style="display: inline;">✓✓</span>
+              </div>
+            `;
+            newRow.appendChild(newBubble);
+
+            if (this.activeModelBubble) {
+              const modelRow = this.activeModelBubble.closest('.chat-bubble-row');
+              if (modelRow) {
+                this.chatThread.insertBefore(newRow, modelRow);
+              } else {
+                this.chatThread.appendChild(newRow);
+              }
+            } else {
+              this.chatThread.appendChild(newRow);
+            }
+            this.lastUserSpokenText = clean;
             this.scrollToBottom();
             break;
           } else if (msg.role === 'model' && msg.text) {

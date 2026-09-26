@@ -545,6 +545,7 @@ async function transcribeAudioAsync(wavBuffer) {
   let speechChunks = [];
   let isSpeakingDetected = false;
   let isClientPlayingAudio = false;
+  let hasClientLiveTranscription = false;
   let silenceTimer = null;
   let chunkCount = 0;
   let consecutiveSpeech = 0;
@@ -623,6 +624,7 @@ async function transcribeAudioAsync(wavBuffer) {
             consecutiveSpeech++;
             if (consecutiveSpeech >= CONSECUTIVE_REQUIRED) {
               isSpeakingDetected = true;
+              hasClientLiveTranscription = false;
               speechChunks = [...preRollChunks, buf];
               preRollChunks.length = 0;
               consecutiveSpeech = 0;
@@ -663,22 +665,26 @@ async function transcribeAudioAsync(wavBuffer) {
                   isTurnPending = true;
                   geminiSession.sendUserAudio(wavData.toString('base64'), 'audio/wav');
 
-                  // Fast parallel transcription via gemini-3.5-transcribe
-                  transcribeAudioAsync(wavData).then((transcribedText) => {
-                    if (transcribedText) {
-                      lastClientTranscript = transcribedText;
-                      if (clientWs.readyState === WebSocket.OPEN) {
-                        console.log(`[Gateway] 🎙️ Speech transcribed via gemini-3.5-transcribe: "${transcribedText}"`);
-                        clientWs.send(JSON.stringify({
-                          type: 'transcript',
-                          role: 'user',
-                          text: transcribedText
-                        }));
+                  // Fast parallel transcription for mobile clients that lack local speech recognition
+                  if (!hasClientLiveTranscription) {
+                    transcribeAudioAsync(wavData).then((transcribedText) => {
+                      if (transcribedText) {
+                        lastClientTranscript = transcribedText;
+                        if (clientWs.readyState === WebSocket.OPEN) {
+                          console.log(`[Gateway] 🎙️ Speech transcribed for mobile client: "${transcribedText}"`);
+                          clientWs.send(JSON.stringify({
+                            type: 'transcript',
+                            role: 'user',
+                            text: transcribedText
+                          }));
+                        }
                       }
-                    }
-                  }).catch((err) => {
-                    console.warn('[Gateway] ⚠️ transcribeAudioAsync failed:', err?.message || err);
-                  });
+                    }).catch((err) => {
+                      console.warn('[Gateway] ⚠️ transcribeAudioAsync failed:', err?.message || err);
+                    });
+                  } else {
+                    console.log(`[Gateway] ⚡ Client provided live speech transcription ("${lastClientTranscript}"); skipped redundant server transcription.`);
+                  }
 
                   // 3.5s Watchdog Fallback:
                   // If Gemini Live does not answer the audio turn within 3.5s (e.g. ambient noise false-alarm or clipped audio),
@@ -715,22 +721,24 @@ async function transcribeAudioAsync(wavBuffer) {
           isTurnPending = true;
           geminiSession.sendUserAudio(wavData.toString('base64'), 'audio/wav');
 
-          // Fast parallel transcription via gemini-3.5-transcribe
-          transcribeAudioAsync(wavData).then((transcribedText) => {
-            if (transcribedText) {
-              lastClientTranscript = transcribedText;
-              if (clientWs.readyState === WebSocket.OPEN) {
-                console.log(`[Gateway] 🎙️ Speech transcribed via gemini-3.5-transcribe: "${transcribedText}"`);
-                clientWs.send(JSON.stringify({
-                  type: 'transcript',
-                  role: 'user',
-                  text: transcribedText
-                }));
+          // Fast parallel transcription for mobile clients
+          if (!hasClientLiveTranscription) {
+            transcribeAudioAsync(wavData).then((transcribedText) => {
+              if (transcribedText) {
+                lastClientTranscript = transcribedText;
+                if (clientWs.readyState === WebSocket.OPEN) {
+                  console.log(`[Gateway] 🎙️ Speech transcribed for mobile client: "${transcribedText}"`);
+                  clientWs.send(JSON.stringify({
+                    type: 'transcript',
+                    role: 'user',
+                    text: transcribedText
+                  }));
+                }
               }
-            }
-          }).catch((err) => {
-            console.warn('[Gateway] ⚠️ transcribeAudioAsync failed:', err?.message || err);
-          });
+            }).catch((err) => {
+              console.warn('[Gateway] ⚠️ transcribeAudioAsync failed:', err?.message || err);
+            });
+          }
         } else {
           geminiSession.signalTurnComplete();
         }
@@ -739,6 +747,7 @@ async function transcribeAudioAsync(wavBuffer) {
         consecutiveSpeech = 0;
       } else if (msg.type === 'user_speech_transcript' && msg.text) {
         lastClientTranscript = msg.text.trim();
+        hasClientLiveTranscription = true;
         if (geminiSession.isEchoOfModel(msg.text)) {
           console.log(`[Gateway] 🛡️ Ignored client speech transcript echo of model: "${msg.text}"`);
         } else {
