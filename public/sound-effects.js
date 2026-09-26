@@ -1,13 +1,13 @@
 /**
  * Sound Effects Manager (Web Audio API Synthesizer)
- * Zero-latency procedural earcons for Orb activation and deactivation.
- * Restored with all 5 sound presets from commit 1402e38.
+ * Iterations on the user's favorite Zen Bell off-tone (E4 329.63Hz).
+ * Same warm sine base, soft 30ms attack, exponential decay, 0.16 master gain.
  */
 
 export class SoundManager {
   constructor(getAudioContext) {
     this.getAudioContext = getAudioContext;
-    this.currentPreset = localStorage.getItem('gemini_sound_preset') || 'zen';
+    this.currentPreset = localStorage.getItem('gemini_sound_preset') || 'zen_original';
     this.isEnabled = localStorage.getItem('gemini_sound_enabled') !== 'false';
   }
 
@@ -23,11 +23,54 @@ export class SoundManager {
 
   getPresets() {
     return [
-      { id: 'zen', name: 'Zen Bell (Favorito)', icon: '🔔', desc: 'El tono grave de cuenco en 329Hz que te gustó en OFF, sonando igual al encender y apagar (0.8s)' },
-      { id: 'quantum', name: 'Quantum HUD (Tesla)', icon: '⚡', desc: 'Barrido futurista estilo Tesla con apagado de frecuencia (1200➔320Hz)' },
-      { id: 'gemini', name: 'Gemini Ambient', icon: '✨', desc: 'Acorde brillante y etéreo de 4 notas con reverb suave (Google AI)' },
-      { id: 'apple', name: 'Siri Minimal', icon: '🍎', desc: 'Chime clásico de dos notas ascendente / descendente (Apple)' },
-      { id: 'marimba', name: 'Boutique Marimba', icon: '🪵', desc: 'Madera acústica y cálida estilo Notion / Linear' }
+      {
+        id: 'zen_original',
+        name: 'Zen 1: Base Original (E4 Fijo)',
+        icon: '🔔',
+        desc: 'El tono exacto de cuenco en 329Hz que te gustó, idéntico tanto al encender como al apagar (0.8s).'
+      },
+      {
+        id: 'zen_harmonic',
+        name: 'Zen 2: Quinta Armónica (La ➔ Mi)',
+        icon: '🎶',
+        desc: 'Misma textura suave: La4 (440Hz) de bienvenida al encender y Mi4 (329Hz) de resolución al apagar.'
+      },
+      {
+        id: 'zen_duo',
+        name: 'Zen 3: Doble Gota (Mi ➔ Sol#)',
+        icon: '✨',
+        desc: 'Dos toques de cuenco sutiles (329Hz ➔ 415Hz al abrir, 415Hz ➔ 329Hz al cerrar).'
+      },
+      {
+        id: 'zen_deep',
+        name: 'Zen 4: Profundo / Grave (277Hz / 220Hz)',
+        icon: '🧘',
+        desc: 'Tonalidades más graves y cálidas con decaimiento de 1.0s (Do#4 al abrir, La3 al cerrar).'
+      },
+      {
+        id: 'zen_shimmer',
+        name: 'Zen 5: Shimmer Sutil (E4 + E5 tenue)',
+        icon: '💎',
+        desc: 'Mi4 con un tenue armónico alto al abrir (12% volumen) y el tono puro en reposo al cerrar.'
+      },
+      {
+        id: 'zen_resonance',
+        name: 'Zen 6: Resonancia Larga (1.4s)',
+        icon: '🕯️',
+        desc: 'Misma nota Mi4 pero con mayor tiempo de resonancia y cola etérea extendida (1.4s).'
+      },
+      {
+        id: 'quantum',
+        name: 'Quantum HUD (Tesla)',
+        icon: '⚡',
+        desc: 'Barrido futurista estilo Tesla con apagado de potencia (1200➔320Hz).'
+      },
+      {
+        id: 'apple',
+        name: 'Siri Minimal',
+        icon: '🍎',
+        desc: 'Chime clásico nítido de dos notas ascendente / descendente.'
+      }
     ];
   }
 
@@ -60,225 +103,102 @@ export class SoundManager {
   }
 
   // ==========================================
-  // PRESET 1: Gemini Ambient (Google AI Style)
+  // CORE HELPER: Pure warm sine bowl generator
+  // (Identical synthesis engine to playZenStop)
   // ==========================================
-  playGeminiStart(ctx, now) {
+  playBowlTone(ctx, now, freq, dur = 0.8, peak = 0.25, delay = 0, masterVol = 0.16) {
     const masterGain = ctx.createGain();
-    masterGain.gain.setValueAtTime(0.22, now);
+    masterGain.gain.setValueAtTime(masterVol, now);
     masterGain.connect(ctx.destination);
 
-    const notes = [
-      { f: 587.33, delay: 0.00, dur: 0.9, type: 'sine' },
-      { f: 739.99, delay: 0.05, dur: 1.1, type: 'sine' },
-      { f: 880.00, delay: 0.10, dur: 1.3, type: 'triangle' },
-      { f: 1174.66, delay: 0.16, dur: 1.4, type: 'sine' }
-    ];
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(freq, now + delay);
 
-    notes.forEach(({ f, delay, dur, type }) => {
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-      const filter = ctx.createBiquadFilter();
+    gain.gain.setValueAtTime(0.0001, now + delay);
+    gain.gain.exponentialRampToValueAtTime(peak, now + delay + 0.03);
+    gain.gain.exponentialRampToValueAtTime(0.0001, now + delay + dur);
 
-      filter.type = 'lowpass';
-      filter.frequency.setValueAtTime(1400, now + delay);
-      filter.frequency.exponentialRampToValueAtTime(3400, now + delay + 0.12);
-      filter.frequency.exponentialRampToValueAtTime(800, now + delay + dur);
-
-      osc.type = type;
-      osc.frequency.setValueAtTime(f, now + delay);
-
-      gain.gain.setValueAtTime(0.0001, now + delay);
-      gain.gain.exponentialRampToValueAtTime(0.28, now + delay + 0.04);
-      gain.gain.exponentialRampToValueAtTime(0.0001, now + delay + dur);
-
-      osc.connect(filter);
-      filter.connect(gain);
-      gain.connect(masterGain);
-
-      osc.start(now + delay);
-      osc.stop(now + delay + dur + 0.05);
-    });
-  }
-
-  playGeminiStop(ctx, now) {
-    const masterGain = ctx.createGain();
-    masterGain.gain.setValueAtTime(0.18, now);
-    masterGain.connect(ctx.destination);
-
-    // Warm descending pair with soft LP filter sweep
-    const notes = [
-      { f: 880.00, delay: 0.00, dur: 0.6 },
-      { f: 587.33, delay: 0.08, dur: 0.7 }
-    ];
-
-    notes.forEach(({ f, delay, dur }) => {
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-      const filter = ctx.createBiquadFilter();
-
-      filter.type = 'lowpass';
-      filter.frequency.setValueAtTime(2200, now + delay);
-      filter.frequency.exponentialRampToValueAtTime(450, now + delay + dur);
-
-      osc.type = 'sine';
-      osc.frequency.setValueAtTime(f, now + delay);
-
-      gain.gain.setValueAtTime(0.0001, now + delay);
-      gain.gain.exponentialRampToValueAtTime(0.25, now + delay + 0.03);
-      gain.gain.exponentialRampToValueAtTime(0.0001, now + delay + dur);
-
-      osc.connect(filter);
-      filter.connect(gain);
-      gain.connect(masterGain);
-
-      osc.start(now + delay);
-      osc.stop(now + delay + dur + 0.05);
-    });
+    osc.connect(gain);
+    gain.connect(masterGain);
+    osc.start(now + delay);
+    osc.stop(now + delay + dur + 0.05);
   }
 
   // ==========================================
-  // PRESET 2: Siri / Apple Minimal
+  // 1. ZEN ORIGINAL (Base que le gustó, E4 fijo)
   // ==========================================
-  playAppleStart(ctx, now) {
-    const masterGain = ctx.createGain();
-    masterGain.gain.setValueAtTime(0.22, now);
-    masterGain.connect(ctx.destination);
-
-    // Crisp two-tone rising chime (F#4 -> C#5)
-    const tones = [
-      { f: 554.37, delay: 0.00, dur: 0.32 },
-      { f: 880.00, delay: 0.09, dur: 0.45 }
-    ];
-
-    tones.forEach(({ f, delay, dur }) => {
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-
-      osc.type = 'sine';
-      osc.frequency.setValueAtTime(f, now + delay);
-
-      gain.gain.setValueAtTime(0.0001, now + delay);
-      gain.gain.exponentialRampToValueAtTime(0.35, now + delay + 0.02);
-      gain.gain.exponentialRampToValueAtTime(0.0001, now + delay + dur);
-
-      osc.connect(gain);
-      gain.connect(masterGain);
-
-      osc.start(now + delay);
-      osc.stop(now + delay + dur + 0.05);
-    });
+  playZenOriginalStart(ctx, now) {
+    this.playBowlTone(ctx, now, 329.63, 0.8, 0.25, 0, 0.16);
   }
-
-  playAppleStop(ctx, now) {
-    const masterGain = ctx.createGain();
-    masterGain.gain.setValueAtTime(0.18, now);
-    masterGain.connect(ctx.destination);
-
-    // Downward two-tone resolving chime (C#5 -> F#4)
-    const tones = [
-      { f: 880.00, delay: 0.00, dur: 0.30 },
-      { f: 554.37, delay: 0.08, dur: 0.40 }
-    ];
-
-    tones.forEach(({ f, delay, dur }) => {
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-
-      osc.type = 'sine';
-      osc.frequency.setValueAtTime(f, now + delay);
-
-      gain.gain.setValueAtTime(0.0001, now + delay);
-      gain.gain.exponentialRampToValueAtTime(0.30, now + delay + 0.02);
-      gain.gain.exponentialRampToValueAtTime(0.0001, now + delay + dur);
-
-      osc.connect(gain);
-      gain.connect(masterGain);
-
-      osc.start(now + delay);
-      osc.stop(now + delay + dur + 0.05);
-    });
+  playZenOriginalStop(ctx, now) {
+    this.playBowlTone(ctx, now, 329.63, 0.8, 0.25, 0, 0.16);
   }
 
   // ==========================================
-  // PRESET 3: Boutique Marimba (Warm Acoustic)
+  // 2. ZEN ARMÓNICO (Quinta: La4 -> Mi4)
   // ==========================================
-  playMarimbaStart(ctx, now) {
-    const masterGain = ctx.createGain();
-    masterGain.gain.setValueAtTime(0.24, now);
-    masterGain.connect(ctx.destination);
-
-    const notes = [
-      { f: 659.25, delay: 0.00, dur: 0.4 },
-      { f: 830.61, delay: 0.11, dur: 0.55 }
-    ];
-
-    notes.forEach(({ f, delay, dur }) => {
-      const osc1 = ctx.createOscillator();
-      const gain1 = ctx.createGain();
-      osc1.type = 'sine';
-      osc1.frequency.setValueAtTime(f, now + delay);
-
-      gain1.gain.setValueAtTime(0.0001, now + delay);
-      gain1.gain.exponentialRampToValueAtTime(0.38, now + delay + 0.008);
-      gain1.gain.exponentialRampToValueAtTime(0.0001, now + delay + dur);
-
-      osc1.connect(gain1);
-      gain1.connect(masterGain);
-      osc1.start(now + delay);
-      osc1.stop(now + delay + dur + 0.05);
-
-      const osc2 = ctx.createOscillator();
-      const gain2 = ctx.createGain();
-      osc2.type = 'triangle';
-      osc2.frequency.setValueAtTime(f * 3, now + delay);
-
-      gain2.gain.setValueAtTime(0.0001, now + delay);
-      gain2.gain.exponentialRampToValueAtTime(0.12, now + delay + 0.004);
-      gain2.gain.exponentialRampToValueAtTime(0.0001, now + delay + 0.05);
-
-      osc2.connect(gain2);
-      gain2.connect(masterGain);
-      osc2.start(now + delay);
-      osc2.stop(now + delay + 0.07);
-    });
+  playZenHarmonicStart(ctx, now) {
+    this.playBowlTone(ctx, now, 440.00, 0.75, 0.24, 0, 0.16);
   }
-
-  playMarimbaStop(ctx, now) {
-    const masterGain = ctx.createGain();
-    masterGain.gain.setValueAtTime(0.20, now);
-    masterGain.connect(ctx.destination);
-
-    const notes = [
-      { f: 830.61, delay: 0.00, dur: 0.35 },
-      { f: 659.25, delay: 0.09, dur: 0.45 }
-    ];
-
-    notes.forEach(({ f, delay, dur }) => {
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-      osc.type = 'sine';
-      osc.frequency.setValueAtTime(f, now + delay);
-
-      gain.gain.setValueAtTime(0.0001, now + delay);
-      gain.gain.exponentialRampToValueAtTime(0.32, now + delay + 0.008);
-      gain.gain.exponentialRampToValueAtTime(0.0001, now + delay + dur);
-
-      osc.connect(gain);
-      gain.connect(masterGain);
-      osc.start(now + delay);
-      osc.stop(now + delay + dur + 0.05);
-    });
+  playZenHarmonicStop(ctx, now) {
+    this.playBowlTone(ctx, now, 329.63, 0.85, 0.25, 0, 0.16);
   }
 
   // ==========================================
-  // PRESET 4: Quantum HUD (Tesla Style Hologram)
+  // 3. ZEN DÚO (Doble Gota Mi ➔ Sol#)
+  // ==========================================
+  playZenDuoStart(ctx, now) {
+    this.playBowlTone(ctx, now, 329.63, 0.6, 0.22, 0.00, 0.16);
+    this.playBowlTone(ctx, now, 415.30, 0.7, 0.24, 0.09, 0.16);
+  }
+  playZenDuoStop(ctx, now) {
+    this.playBowlTone(ctx, now, 415.30, 0.6, 0.22, 0.00, 0.16);
+    this.playBowlTone(ctx, now, 329.63, 0.75, 0.24, 0.09, 0.16);
+  }
+
+  // ==========================================
+  // 4. ZEN PROFUNDO (Sub / Grave: 277Hz / 220Hz)
+  // ==========================================
+  playZenDeepStart(ctx, now) {
+    this.playBowlTone(ctx, now, 277.18, 0.9, 0.26, 0, 0.18);
+  }
+  playZenDeepStop(ctx, now) {
+    this.playBowlTone(ctx, now, 220.00, 1.05, 0.28, 0, 0.18);
+  }
+
+  // ==========================================
+  // 5. ZEN SHIMMER (E4 + E5 tenue)
+  // ==========================================
+  playZenShimmerStart(ctx, now) {
+    // Fundamental
+    this.playBowlTone(ctx, now, 329.63, 0.8, 0.25, 0, 0.16);
+    // Subtle higher octave shimmer at low volume
+    this.playBowlTone(ctx, now, 659.25, 0.6, 0.05, 0.02, 0.16);
+  }
+  playZenShimmerStop(ctx, now) {
+    this.playBowlTone(ctx, now, 329.63, 0.8, 0.25, 0, 0.16);
+  }
+
+  // ==========================================
+  // 6. ZEN RESONANCIA LARGA (1.4s)
+  // ==========================================
+  playZenResonanceStart(ctx, now) {
+    this.playBowlTone(ctx, now, 329.63, 1.2, 0.25, 0, 0.16);
+  }
+  playZenResonanceStop(ctx, now) {
+    this.playBowlTone(ctx, now, 329.63, 1.4, 0.25, 0, 0.16);
+  }
+
+  // ==========================================
+  // QUANTUM HUD (Tesla)
   // ==========================================
   playQuantumStart(ctx, now) {
     const masterGain = ctx.createGain();
     masterGain.gain.setValueAtTime(0.18, now);
     masterGain.connect(ctx.destination);
 
-    // Subtle upward holographic sweep + crystal ping
     const sweep = ctx.createOscillator();
     const sweepGain = ctx.createGain();
     sweep.type = 'sine';
@@ -294,7 +214,6 @@ export class SoundManager {
     sweep.start(now);
     sweep.stop(now + 0.16);
 
-    // Crystal ping
     const ping = ctx.createOscillator();
     const pingGain = ctx.createGain();
     ping.type = 'sine';
@@ -315,7 +234,6 @@ export class SoundManager {
     masterGain.gain.setValueAtTime(0.18, now);
     masterGain.connect(ctx.destination);
 
-    // Downward gentle power-down sweep (Tesla style: 1200Hz -> 320Hz)
     const sweep = ctx.createOscillator();
     const sweepGain = ctx.createGain();
     sweep.type = 'sine';
@@ -333,56 +251,93 @@ export class SoundManager {
   }
 
   // ==========================================
-  // PRESET 5: Zen Bell (Soft Low Bowl Tone)
+  // SIRI MINIMAL (Apple)
   // ==========================================
-  playZenStart(ctx, now) {
-    // Both ON and OFF use the exact same soft low bowl tone (329.63Hz)
-    return this.playZenStop(ctx, now);
-  }
-
-  playZenStop(ctx, now) {
+  playAppleStart(ctx, now) {
     const masterGain = ctx.createGain();
-    masterGain.gain.setValueAtTime(0.16, now);
+    masterGain.gain.setValueAtTime(0.22, now);
     masterGain.connect(ctx.destination);
 
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
-    osc.type = 'sine';
-    osc.frequency.setValueAtTime(329.63, now);
+    const tones = [
+      { f: 554.37, delay: 0.00, dur: 0.32 },
+      { f: 880.00, delay: 0.09, dur: 0.45 }
+    ];
 
-    gain.gain.setValueAtTime(0.0001, now);
-    gain.gain.exponentialRampToValueAtTime(0.25, now + 0.03);
-    gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.8);
+    tones.forEach(({ f, delay, dur }) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(f, now + delay);
 
-    osc.connect(gain);
-    gain.connect(masterGain);
-    osc.start(now);
-    osc.stop(now + 0.85);
+      gain.gain.setValueAtTime(0.0001, now + delay);
+      gain.gain.exponentialRampToValueAtTime(0.35, now + delay + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.0001, now + delay + dur);
+
+      osc.connect(gain);
+      gain.connect(masterGain);
+      osc.start(now + delay);
+      osc.stop(now + delay + dur + 0.05);
+    });
+  }
+
+  playAppleStop(ctx, now) {
+    const masterGain = ctx.createGain();
+    masterGain.gain.setValueAtTime(0.18, now);
+    masterGain.connect(ctx.destination);
+
+    const tones = [
+      { f: 880.00, delay: 0.00, dur: 0.30 },
+      { f: 554.37, delay: 0.08, dur: 0.40 }
+    ];
+
+    tones.forEach(({ f, delay, dur }) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(f, now + delay);
+
+      gain.gain.setValueAtTime(0.0001, now + delay);
+      gain.gain.exponentialRampToValueAtTime(0.30, now + delay + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.0001, now + delay + dur);
+
+      osc.connect(gain);
+      gain.connect(masterGain);
+      osc.start(now + delay);
+      osc.stop(now + delay + dur + 0.05);
+    });
   }
 
   playStartSound(ctx, preset) {
     const now = ctx.currentTime;
     switch (preset) {
-      case 'apple': return this.playAppleStart(ctx, now);
-      case 'marimba': return this.playMarimbaStart(ctx, now);
+      case 'zen_harmonic': return this.playZenHarmonicStart(ctx, now);
+      case 'zen_duo': return this.playZenDuoStart(ctx, now);
+      case 'zen_deep': return this.playZenDeepStart(ctx, now);
+      case 'zen_shimmer': return this.playZenShimmerStart(ctx, now);
+      case 'zen_resonance': return this.playZenResonanceStart(ctx, now);
       case 'quantum': return this.playQuantumStart(ctx, now);
-      case 'zen': return this.playZenStart(ctx, now);
-      case 'gemini':
+      case 'apple': return this.playAppleStart(ctx, now);
+      case 'zen':
+      case 'zen_original':
       default:
-        return this.playGeminiStart(ctx, now);
+        return this.playZenOriginalStart(ctx, now);
     }
   }
 
   playStopSound(ctx, preset) {
     const now = ctx.currentTime;
     switch (preset) {
-      case 'apple': return this.playAppleStop(ctx, now);
-      case 'marimba': return this.playMarimbaStop(ctx, now);
+      case 'zen_harmonic': return this.playZenHarmonicStop(ctx, now);
+      case 'zen_duo': return this.playZenDuoStop(ctx, now);
+      case 'zen_deep': return this.playZenDeepStop(ctx, now);
+      case 'zen_shimmer': return this.playZenShimmerStop(ctx, now);
+      case 'zen_resonance': return this.playZenResonanceStop(ctx, now);
       case 'quantum': return this.playQuantumStop(ctx, now);
-      case 'zen': return this.playZenStop(ctx, now);
-      case 'gemini':
+      case 'apple': return this.playAppleStop(ctx, now);
+      case 'zen':
+      case 'zen_original':
       default:
-        return this.playGeminiStop(ctx, now);
+        return this.playZenOriginalStop(ctx, now);
     }
   }
 }
