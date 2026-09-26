@@ -656,6 +656,22 @@ html, body {
   min-width: 160px;
 }
 
+/* Smooth fade & slide when voice note morphs into text */
+.bubble-text-morph {
+  animation: bubbleTextMorph 0.28s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes bubbleTextMorph {
+  from {
+    opacity: 0;
+    transform: translateY(3px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
 .bubble-voice-content {
   display: flex;
   align-items: center;

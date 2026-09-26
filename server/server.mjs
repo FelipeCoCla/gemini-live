@@ -498,6 +498,42 @@ function pcmToWavBuffer(pcmBuf, sampleRate = 16000) {
   return Buffer.concat([wavHeader, pcmBuf]);
 }
 
+/**
+ * Fast parallel audio transcription using Google Gemini 3.5 Transcribe.
+ * Runs asynchronously alongside Gemini Live without blocking vocal response streaming.
+ * Emits the exact transcribed sentence to Android and Desktop clients.
+ * @param {Buffer|string} wavBuffer
+ * @returns {Promise<string>}
+ */
+async function transcribeAudioAsync(wavBuffer) {
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey || !wavBuffer) return '';
+  try {
+    const base64Data = Buffer.isBuffer(wavBuffer) ? wavBuffer.toString('base64') : String(wavBuffer);
+    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-transcribe:generateContent?key=${apiKey}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [{
+          parts: [{ inlineData: { mimeType: 'audio/wav', data: base64Data } }]
+        }]
+      })
+    });
+    if (!res.ok) {
+      const errBody = await res.text();
+      console.warn(`[Gateway] ⚠️ Fast transcribe HTTP ${res.status}:`, errBody);
+      return '';
+    }
+    const data = await res.json();
+    const text = data.candidates?.[0]?.content?.parts?.[0]?.audioTranscription?.text || 
+                 data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+    return text.trim();
+  } catch (err) {
+    console.warn('[Gateway] ⚠️ Fast transcribe error:', err.message);
+    return '';
+  }
+}
+
   activeSessions.set(clientWs, geminiSession);
 
   // Connect to Gemini Live
@@ -540,6 +576,19 @@ function pcmToWavBuffer(pcmBuf, sampleRate = 16000) {
         consecutiveSpeech = 0;
         isTurnPending = true;
         geminiSession.sendUserAudio(msg.data, msg.mimeType || 'audio/wav');
+        transcribeAudioAsync(msg.data).then((transcribedText) => {
+          if (transcribedText) {
+            lastClientTranscript = transcribedText;
+            if (clientWs.readyState === WebSocket.OPEN) {
+              console.log(`[Gateway] 🎙️ Speech transcribed via gemini-3.5-transcribe: "${transcribedText}"`);
+              clientWs.send(JSON.stringify({
+                type: 'transcript',
+                role: 'user',
+                text: transcribedText
+              }));
+            }
+          }
+        }).catch(() => {});
       } else if (msg.type === 'audio' && msg.data) {
         chunkCount++;
         const buf = Buffer.from(msg.data, 'base64');
@@ -614,6 +663,23 @@ function pcmToWavBuffer(pcmBuf, sampleRate = 16000) {
                   isTurnPending = true;
                   geminiSession.sendUserAudio(wavData.toString('base64'), 'audio/wav');
 
+                  // Fast parallel transcription via gemini-3.5-transcribe
+                  transcribeAudioAsync(wavData).then((transcribedText) => {
+                    if (transcribedText) {
+                      lastClientTranscript = transcribedText;
+                      if (clientWs.readyState === WebSocket.OPEN) {
+                        console.log(`[Gateway] 🎙️ Speech transcribed via gemini-3.5-transcribe: "${transcribedText}"`);
+                        clientWs.send(JSON.stringify({
+                          type: 'transcript',
+                          role: 'user',
+                          text: transcribedText
+                        }));
+                      }
+                    }
+                  }).catch((err) => {
+                    console.warn('[Gateway] ⚠️ transcribeAudioAsync failed:', err?.message || err);
+                  });
+
                   // 3.5s Watchdog Fallback:
                   // If Gemini Live does not answer the audio turn within 3.5s (e.g. ambient noise false-alarm or clipped audio),
                   // and we have a high-confidence transcript from client speech recognition, recover immediately via text!
@@ -648,6 +714,23 @@ function pcmToWavBuffer(pcmBuf, sampleRate = 16000) {
           console.log(`[Gateway] 🏁 turn_complete: Committing ${pcmData.length} bytes to Gemini Live...`);
           isTurnPending = true;
           geminiSession.sendUserAudio(wavData.toString('base64'), 'audio/wav');
+
+          // Fast parallel transcription via gemini-3.5-transcribe
+          transcribeAudioAsync(wavData).then((transcribedText) => {
+            if (transcribedText) {
+              lastClientTranscript = transcribedText;
+              if (clientWs.readyState === WebSocket.OPEN) {
+                console.log(`[Gateway] 🎙️ Speech transcribed via gemini-3.5-transcribe: "${transcribedText}"`);
+                clientWs.send(JSON.stringify({
+                  type: 'transcript',
+                  role: 'user',
+                  text: transcribedText
+                }));
+              }
+            }
+          }).catch((err) => {
+            console.warn('[Gateway] ⚠️ transcribeAudioAsync failed:', err?.message || err);
+          });
         } else {
           geminiSession.signalTurnComplete();
         }

@@ -28,6 +28,7 @@ class VoiceApp {
     this.quickTextInput = document.getElementById('quick-text-input');
 
     this.activeUserBubble = null;
+    this.lastVoiceNoteBubble = null;
     this.activeModelBubble = null;
     this.lastUserSpokenText = '';
     this.recognition = null;
@@ -300,7 +301,50 @@ class VoiceApp {
     row.appendChild(bubble);
     this.chatThread.appendChild(row);
     this.scrollToBottom();
+    this.lastVoiceNoteBubble = bubble;
+    this.activeUserBubble = bubble;
     return bubble;
+  }
+
+  morphVoiceBubbleToText(bubble, text) {
+    if (!bubble) return;
+    bubble.classList.remove('voice-note-bubble');
+    bubble.classList.remove('is-speaking');
+    const voiceContent = bubble.querySelector('.bubble-voice-content');
+    if (voiceContent) voiceContent.remove();
+    const oldTranscript = bubble.querySelector('.voice-note-transcript');
+    if (oldTranscript) oldTranscript.remove();
+
+    let textEl = bubble.querySelector('.bubble-text');
+    if (!textEl) {
+      textEl = document.createElement('div');
+      textEl.className = 'bubble-text bubble-text-morph';
+      const meta = bubble.querySelector('.bubble-meta');
+      if (meta) {
+        bubble.insertBefore(textEl, meta);
+      } else {
+        bubble.appendChild(textEl);
+      }
+    }
+    textEl.textContent = text;
+
+    const time = bubble.querySelector('.bubble-time');
+    if (time && (time.textContent === 'hablando...' || !time.textContent)) {
+      time.textContent = this.getCurrentTime();
+    }
+    const ticks = bubble.querySelector('.bubble-ticks');
+    if (ticks) ticks.style.display = 'inline';
+    const dot = bubble.querySelector('.bubble-speaking-dot');
+    if (dot) dot.remove();
+
+    if (this.lastVoiceNoteBubble === bubble) {
+      this.lastVoiceNoteBubble = null;
+    }
+    if (this.activeUserBubble === bubble) {
+      this.activeUserBubble = null;
+    }
+    this.lastUserSpokenText = text;
+    this.scrollToBottom();
   }
 
   appendModelMessage(text, isLive = false) {
@@ -922,13 +966,19 @@ class VoiceApp {
               // If the user's bubble had a truncated stub from local speech rec (e.g. "el", < 6 chars),
               // enrich it with the full task intent that Gemini recognized from the audio!
               const lastUserRow = this.chatThread.querySelector('.user-row:last-of-type');
-              const targetBubble = this.activeUserBubble || (lastUserRow ? lastUserRow.querySelector('.chat-bubble') : null);
+              const targetBubble = this.lastVoiceNoteBubble || 
+                                   this.activeUserBubble || 
+                                   (lastUserRow ? lastUserRow.querySelector('.chat-bubble') : null);
               if (targetBubble) {
-                const textEl = targetBubble.querySelector('.bubble-text');
-                if (textEl && textEl.textContent.trim().length <= 6) {
-                  console.log(`[PWA] 🚀 Auto-enriched truncated bubble ("${textEl.textContent}") with task intent: "${msg.metadata.task}"`);
-                  textEl.textContent = msg.metadata.task;
-                  this.lastUserSpokenText = msg.metadata.task;
+                if (targetBubble.classList.contains('voice-note-bubble')) {
+                  this.morphVoiceBubbleToText(targetBubble, msg.metadata.task);
+                } else {
+                  const textEl = targetBubble.querySelector('.bubble-text');
+                  if (textEl && textEl.textContent.trim().length <= 6) {
+                    console.log(`[PWA] 🚀 Auto-enriched truncated bubble ("${textEl.textContent}") with task intent: "${msg.metadata.task}"`);
+                    textEl.textContent = msg.metadata.task;
+                    this.lastUserSpokenText = msg.metadata.task;
+                  }
                 }
               }
             }
@@ -988,7 +1038,8 @@ class VoiceApp {
           // On Desktop, user input is ALWAYS text (via live SpeechRecognition or input box).
           // Desktop will NEVER display voice note audio bubbles!
           if (this.isMobileDevice()) {
-            this.appendVoiceNoteMessage(durStr);
+            this.activeUserBubble = this.appendVoiceNoteMessage(durStr);
+            this.lastVoiceNoteBubble = this.activeUserBubble;
           } else if (this.activeUserBubble) {
             // Keep the activeUserBubble reference so Chrome's subsequent isFinal doesn't duplicate it!
             this.activeUserBubble.classList.remove('is-speaking');
@@ -1034,26 +1085,17 @@ class VoiceApp {
               this.activeModelBubble = null;
             }
 
-            // Locate the user's current bubble to upgrade it with full high-fidelity transcription
+            // Locate the user's current bubble to upgrade or morph it
             const lastUserRow = this.chatThread.querySelector('.user-row:last-of-type');
-            const targetBubble = this.activeUserBubble || (lastUserRow ? lastUserRow.querySelector('.chat-bubble') : null);
+            const targetBubble = this.lastVoiceNoteBubble || 
+                                 this.activeUserBubble || 
+                                 (lastUserRow ? lastUserRow.querySelector('.chat-bubble') : null);
 
             if (targetBubble) {
               if (targetBubble.classList.contains('voice-note-bubble')) {
-                // On Mobile: show transcription beneath the voice note badge
-                let noteTextEl = targetBubble.querySelector('.voice-note-transcript');
-                if (!noteTextEl) {
-                  noteTextEl = document.createElement('div');
-                  noteTextEl.className = 'voice-note-transcript';
-                  noteTextEl.style.cssText = 'margin-top: 6px; font-size: 0.92rem; line-height: 1.4; color: #e9edef; padding-top: 4px; border-top: 1px solid rgba(255,255,255,0.12);';
-                  const metaEl = targetBubble.querySelector('.bubble-meta');
-                  if (metaEl) {
-                    targetBubble.insertBefore(noteTextEl, metaEl);
-                  } else {
-                    targetBubble.appendChild(noteTextEl);
-                  }
-                }
-                noteTextEl.textContent = clean;
+                // On Mobile: Replace the voice note audio bubble with the exact transcribed text!
+                console.log(`[PWA] 🔄 Morphing voice note audio bubble into text: "${clean}"`);
+                this.morphVoiceBubbleToText(targetBubble, clean);
               } else {
                 // On Desktop: upgrade truncated text to Gemini's full transcription
                 const textEl = targetBubble.querySelector('.bubble-text');
@@ -1070,6 +1112,7 @@ class VoiceApp {
                   const ticks = targetBubble.querySelector('.bubble-ticks');
                   if (ticks) ticks.style.display = 'inline';
                 }
+                this.activeUserBubble = null;
               }
               this.lastUserSpokenText = clean;
             } else {
