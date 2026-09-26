@@ -5,7 +5,7 @@
  */
 
 import { GlowingOrb } from './orb.js?v=14';
-import { SoundManager } from './sound-effects.js?v=5';
+import { SoundManager } from './sound-effects.js?v=6';
 
 class VoiceApp {
   constructor() {
@@ -185,6 +185,7 @@ class VoiceApp {
   }
 
   initSoundControls() {
+    const container = document.getElementById('sound-presets-list');
     const toggle = document.getElementById('sound-effects-toggle');
     if (toggle) {
       toggle.checked = this.soundManager.isEnabled;
@@ -193,13 +194,68 @@ class VoiceApp {
       });
     }
 
-    const previewBtn = document.getElementById('btn-preview-orb-sound');
-    if (previewBtn) {
-      previewBtn.addEventListener('click', (e) => {
+    if (!container) return;
+    const presets = this.soundManager.getPresets();
+    const currentPreset = this.soundManager.currentPreset;
+
+    container.innerHTML = '';
+    presets.forEach(p => {
+      const card = document.createElement('div');
+      card.className = `sound-card ${p.id === currentPreset ? 'is-active' : ''}`;
+      card.id = `sound-card-${p.id}`;
+      card.innerHTML = `
+        <div class="sound-card-header">
+          <div class="sound-card-title">
+            <span>${p.icon || '🎵'}</span>
+            <span>${p.name}</span>
+          </div>
+        </div>
+        <div class="sound-card-desc">${p.desc}</div>
+        <div class="sound-card-actions">
+          <button type="button" class="sound-btn-audition btn-start" title="Escuchar sonido al encender">
+            <span>▶</span>
+            <span>Iniciar (ON)</span>
+          </button>
+          <button type="button" class="sound-btn-audition btn-stop" title="Escuchar sonido al apagar">
+            <span>■</span>
+            <span>Apagar (OFF)</span>
+          </button>
+          <button type="button" class="sound-btn-select" title="Usar este sonido">
+            ${p.id === currentPreset ? '✓ En uso' : 'Usar'}
+          </button>
+        </div>
+      `;
+
+      const startBtn = card.querySelector('.btn-start');
+      const stopBtn = card.querySelector('.btn-stop');
+      const selectBtn = card.querySelector('.sound-btn-select');
+
+      startBtn.addEventListener('click', (e) => {
         e.stopPropagation();
-        this.soundManager.play();
+        this.soundManager.play('start', p.id);
       });
-    }
+
+      stopBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        this.soundManager.play('stop', p.id);
+      });
+
+      selectBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        this.soundManager.setPreset(p.id);
+        this.soundManager.play('start', p.id); // Play brief audio preview as feedback
+        
+        container.querySelectorAll('.sound-card').forEach(c => {
+          c.classList.remove('is-active');
+          const btn = c.querySelector('.sound-btn-select');
+          if (btn) btn.textContent = 'Usar';
+        });
+        card.classList.add('is-active');
+        selectBtn.textContent = '✓ En uso';
+      });
+
+      container.appendChild(card);
+    });
   }
 
   getCurrentTime() {
