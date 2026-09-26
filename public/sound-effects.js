@@ -1,7 +1,6 @@
 /**
  * Sound Effects Manager (Web Audio API Synthesizer)
- * Zero-latency procedural earcon for Orb activation and deactivation.
- * Uses the exact warm two-tone sound currently used in OFF for both ON and OFF.
+ * Uses the EXACT original deactivation sound (commit 1402e38) for both ON and OFF.
  */
 
 export class SoundManager {
@@ -15,7 +14,7 @@ export class SoundManager {
     localStorage.setItem('gemini_sound_enabled', String(this.isEnabled));
   }
 
-  play(type = 'toggle') {
+  play() {
     if (!this.isEnabled) return;
     let ctx = typeof this.getAudioContext === 'function' ? this.getAudioContext() : this.getAudioContext;
     if (!ctx) {
@@ -31,18 +30,18 @@ export class SoundManager {
     }
 
     try {
-      this.playOffSound(ctx);
+      this.playOriginalOffSound(ctx);
     } catch (e) {
       console.warn('[SoundManager] Error playing sound:', e);
     }
   }
 
-  // The exact sound currently used in OFF
-  // Pure sine tones in La (880Hz) -> Re (587Hz) with warm lowpass closing filter
-  playOffSound(ctx) {
+  // Exact original sound from deactivating the orb (playGeminiStop in 1402e38):
+  // Warm descending pair with soft LP filter sweep (880Hz -> 587.33Hz)
+  playOriginalOffSound(ctx) {
     const now = ctx.currentTime;
     const masterGain = ctx.createGain();
-    masterGain.gain.setValueAtTime(0.24, now);
+    masterGain.gain.setValueAtTime(0.18, now);
     masterGain.connect(ctx.destination);
 
     const notes = [
@@ -63,7 +62,7 @@ export class SoundManager {
       osc.frequency.setValueAtTime(f, now + delay);
 
       gain.gain.setValueAtTime(0.0001, now + delay);
-      gain.gain.exponentialRampToValueAtTime(0.30, now + delay + 0.03);
+      gain.gain.exponentialRampToValueAtTime(0.25, now + delay + 0.03);
       gain.gain.exponentialRampToValueAtTime(0.0001, now + delay + dur);
 
       osc.connect(filter);
