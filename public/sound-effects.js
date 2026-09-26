@@ -7,7 +7,7 @@
 export class SoundManager {
   constructor(getAudioContext) {
     this.getAudioContext = getAudioContext;
-    this.currentPreset = localStorage.getItem('gemini_sound_preset') || 'quantum';
+    this.currentPreset = localStorage.getItem('gemini_sound_preset') || 'zen';
     this.isEnabled = localStorage.getItem('gemini_sound_enabled') !== 'false';
   }
 
@@ -23,11 +23,11 @@ export class SoundManager {
 
   getPresets() {
     return [
+      { id: 'zen', name: 'Zen Bell (Favorito)', icon: '🔔', desc: 'El tono grave de cuenco en 329Hz que te gustó en OFF, sonando igual al encender y apagar (0.8s)' },
       { id: 'quantum', name: 'Quantum HUD (Tesla)', icon: '⚡', desc: 'Barrido futurista estilo Tesla con apagado de frecuencia (1200➔320Hz)' },
       { id: 'gemini', name: 'Gemini Ambient', icon: '✨', desc: 'Acorde brillante y etéreo de 4 notas con reverb suave (Google AI)' },
       { id: 'apple', name: 'Siri Minimal', icon: '🍎', desc: 'Chime clásico de dos notas ascendente / descendente (Apple)' },
-      { id: 'marimba', name: 'Boutique Marimba', icon: '🪵', desc: 'Madera acústica y cálida estilo Notion / Linear' },
-      { id: 'zen', name: 'Zen Bell', icon: '🔔', desc: 'Campana tibetana armónica y relajante con decaimiento de 1.8s' }
+      { id: 'marimba', name: 'Boutique Marimba', icon: '🪵', desc: 'Madera acústica y cálida estilo Notion / Linear' }
     ];
   }
 
@@ -333,34 +333,11 @@ export class SoundManager {
   }
 
   // ==========================================
-  // PRESET 5: Zen Bell (Harmonic Singing Bowl)
+  // PRESET 5: Zen Bell (Soft Low Bowl Tone)
   // ==========================================
   playZenStart(ctx, now) {
-    const masterGain = ctx.createGain();
-    masterGain.gain.setValueAtTime(0.20, now);
-    masterGain.connect(ctx.destination);
-
-    const harmonics = [
-      { f: 440.00, peak: 0.35, dur: 1.8 },
-      { f: 659.25, peak: 0.20, dur: 1.5 },
-      { f: 1320.00, peak: 0.08, dur: 1.0 }
-    ];
-
-    harmonics.forEach(({ f, peak, dur }) => {
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-      osc.type = 'sine';
-      osc.frequency.setValueAtTime(f, now);
-
-      gain.gain.setValueAtTime(0.0001, now);
-      gain.gain.exponentialRampToValueAtTime(peak, now + 0.025);
-      gain.gain.exponentialRampToValueAtTime(0.0001, now + dur);
-
-      osc.connect(gain);
-      gain.connect(masterGain);
-      osc.start(now);
-      osc.stop(now + dur + 0.05);
-    });
+    // Both ON and OFF use the exact same soft low bowl tone (329.63Hz)
+    return this.playZenStop(ctx, now);
   }
 
   playZenStop(ctx, now) {
