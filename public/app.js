@@ -454,30 +454,39 @@ class VoiceApp {
       this.recognition.continuous = true;
       this.recognition.interimResults = true;
       this.recognition.lang = navigator.language || 'es-ES';
+      this.recognitionStartIndex = 0;
+      this.lastResultLength = 0;
 
       this.recognition.onstart = () => {
+        this.recognitionStartIndex = 0;
+        this.lastResultLength = 0;
         console.log('[PWA] 🎙️ Live SpeechRecognition active (lang:', this.recognition.lang, ')');
       };
 
       this.recognition.onresult = (event) => {
-        // Drop recognition immediately if Gemini is playing audio or recognition is gated
-        if (this.isPlayingAudio || !this.isRecognitionAllowed) {
+        // Drop recognition immediately if Gemini is playing audio
+        if (this.isPlayingAudio) {
           return;
         }
+
+        this.lastResultLength = event.results.length;
 
         let interimText = '';
         let finalText = '';
 
-        for (let i = event.resultIndex; i < event.results.length; ++i) {
+        // Accumulate ALL results for the current utterance starting from recognitionStartIndex
+        // (Fixes Chrome bug where looping only from event.resultIndex dropped earlier words like "conecta con")
+        const startIdx = Math.min(this.recognitionStartIndex || 0, event.results.length - 1);
+        for (let i = Math.max(0, startIdx); i < event.results.length; ++i) {
           const trans = event.results[i][0].transcript;
           if (event.results[i].isFinal) {
-            finalText += trans;
+            finalText += (finalText ? ' ' : '') + trans.trim();
           } else {
-            interimText += trans;
+            interimText += (interimText ? ' ' : '') + trans.trim();
           }
         }
 
-        const candidate = finalText || interimText;
+        const candidate = (finalText + (interimText ? ' ' + interimText : '')).trim();
         const currentText = this.cleanTranscript(candidate);
         if (!currentText) return;
 
@@ -487,7 +496,7 @@ class VoiceApp {
           return;
         }
 
-        this.handleUserSpeechInput(currentText, Boolean(finalText));
+        this.handleUserSpeechInput(currentText, Boolean(finalText && !interimText));
       };
 
       this.recognition.onerror = (e) => {
@@ -909,6 +918,19 @@ class VoiceApp {
             this.setStatus(`Hermes orquestando${taskInfo}...`, "thinking");
             if (msg.metadata?.task) {
               this.appendSystemPill(`Hermes: ${msg.metadata.task}`, '⚙️');
+
+              // If the user's bubble had a truncated stub from local speech rec (e.g. "el", < 6 chars),
+              // enrich it with the full task intent that Gemini recognized from the audio!
+              const lastUserRow = this.chatThread.querySelector('.user-row:last-of-type');
+              const targetBubble = this.activeUserBubble || (lastUserRow ? lastUserRow.querySelector('.chat-bubble') : null);
+              if (targetBubble) {
+                const textEl = targetBubble.querySelector('.bubble-text');
+                if (textEl && textEl.textContent.trim().length <= 6) {
+                  console.log(`[PWA] 🚀 Auto-enriched truncated bubble ("${textEl.textContent}") with task intent: "${msg.metadata.task}"`);
+                  textEl.textContent = msg.metadata.task;
+                  this.lastUserSpokenText = msg.metadata.task;
+                }
+              }
             }
           } else if (msg.state === 'speaking') {
             this.setChatStatus("hablando...");
@@ -1012,29 +1034,62 @@ class VoiceApp {
               this.activeModelBubble = null;
             }
 
-            // On Desktop: client SpeechRecognition or sendUserText handles user text bubbles directly.
-            // NEVER append duplicate bubbles on Desktop from server transcripts!
-            if (!this.isMobileDevice()) {
-              if (this.activeUserBubble) {
-                const textEl = this.activeUserBubble.querySelector('.bubble-text');
-                if (textEl && !textEl.textContent.trim()) {
-                  textEl.textContent = clean;
+            // Locate the user's current bubble to upgrade it with full high-fidelity transcription
+            const lastUserRow = this.chatThread.querySelector('.user-row:last-of-type');
+            const targetBubble = this.activeUserBubble || (lastUserRow ? lastUserRow.querySelector('.chat-bubble') : null);
+
+            if (targetBubble) {
+              if (targetBubble.classList.contains('voice-note-bubble')) {
+                // On Mobile: show transcription beneath the voice note badge
+                let noteTextEl = targetBubble.querySelector('.voice-note-transcript');
+                if (!noteTextEl) {
+                  noteTextEl = document.createElement('div');
+                  noteTextEl.className = 'voice-note-transcript';
+                  noteTextEl.style.cssText = 'margin-top: 6px; font-size: 0.92rem; line-height: 1.4; color: #e9edef; padding-top: 4px; border-top: 1px solid rgba(255,255,255,0.12);';
+                  const metaEl = targetBubble.querySelector('.bubble-meta');
+                  if (metaEl) {
+                    targetBubble.insertBefore(noteTextEl, metaEl);
+                  } else {
+                    targetBubble.appendChild(noteTextEl);
+                  }
+                }
+                noteTextEl.textContent = clean;
+              } else {
+                // On Desktop: upgrade truncated text to Gemini's full transcription
+                const textEl = targetBubble.querySelector('.bubble-text');
+                if (textEl) {
+                  if (textEl.textContent.trim() !== clean) {
+                    console.log(`[PWA] ✨ Upgraded user bubble from "${textEl.textContent}" to full transcript: "${clean}"`);
+                    textEl.textContent = clean;
+                  }
+                  targetBubble.classList.remove('is-speaking');
+                  const dot = targetBubble.querySelector('.bubble-speaking-dot');
+                  if (dot) dot.remove();
+                  const time = targetBubble.querySelector('.bubble-time');
+                  if (time && time.textContent === 'hablando...') time.textContent = this.getCurrentTime();
+                  const ticks = targetBubble.querySelector('.bubble-ticks');
+                  if (ticks) ticks.style.display = 'inline';
                 }
               }
-              break;
-            }
-
-            // On Mobile: if a server transcript arrives, display it (if not duplicate)
-            if (clean.trim().toLowerCase() !== (this.lastUserSpokenText || '').trim().toLowerCase()) {
+              this.lastUserSpokenText = clean;
+            } else {
               this.appendUserMessage(clean, false);
               this.lastUserSpokenText = clean;
             }
+
             this.setChatStatus("pensando...");
+            this.scrollToBottom();
+            break;
           } else if (msg.role === 'model' && msg.text) {
             const clean = this.cleanTranscript(msg.text);
             if (!clean) break;
 
             this.addRecentModelText(clean);
+
+            // Advance speech recognition index so next user turn starts fresh without leftover words
+            if (this.recognition) {
+              this.recognitionStartIndex = this.lastResultLength || 0;
+            }
 
             if (this.finalizeModelBubbleTimer) {
               clearTimeout(this.finalizeModelBubbleTimer);
@@ -1157,13 +1212,14 @@ class VoiceApp {
         const idx = this.scheduledSources.indexOf(source);
         if (idx > -1) this.scheduledSources.splice(idx, 1);
 
-        // If no more audio is scheduled, start quick cooldown before reopening mic
+        // If no more audio is scheduled, start ultra-fast cooldown before reopening mic
         if (this.scheduledSources.length === 0) {
           if (this.playbackEndTimer) clearTimeout(this.playbackEndTimer);
-          // Fast 200ms cooldown so user voice is never cut off
+          // Ultra-fast 40ms cooldown so user voice is NEVER cut off when replying quickly
           this.playbackEndTimer = setTimeout(() => {
             if (this.scheduledSources.length === 0) {
               this.isPlayingAudio = false;
+              this.isRecognitionAllowed = true;
               if (this.ws && this.ws.readyState === WebSocket.OPEN) {
                 this.ws.send(JSON.stringify({ type: 'playback_state', playing: false }));
               }
