@@ -130,21 +130,24 @@
 
       <div style="height: 1px; background: rgba(56, 189, 248, 0.15); margin: 14px 0;"></div>
 
-      <!-- Earcons / Sonidos del Orbe -->
+      <!-- Sonido del Orbe -->
       <div class="drawer-header">
         <div style="display:flex; align-items:center; gap:8px;">
           <span style="font-size:1.15rem;">🎵</span>
-          <h3 style="margin:0;">Sonidos del Orbe</h3>
+          <h3 style="margin:0;">Sonido del Orbe</h3>
         </div>
-        <label class="sound-switch" title="Activar/Silenciar efectos de sonido">
+        <label class="sound-switch" title="Activar/Silenciar sonido">
           <input type="checkbox" id="sound-effects-toggle" checked>
           <span class="sound-slider"></span>
         </label>
       </div>
-      <p class="drawer-desc">Efectos de 1–2 seg al presionar el orbe para iniciar o apagar. Escucha cada opción y elige tu favorita:</p>
+      <p class="drawer-desc">El sonido que suena al encender y al apagar el orbe.</p>
 
-      <div class="sound-presets-list" id="sound-presets-list">
-        <!-- Rendered dynamically by SoundManager in app.js -->
+      <div style="margin-bottom: 14px;">
+        <button type="button" id="btn-preview-orb-sound" class="sound-btn-audition" style="width: 100%; justify-content: center; padding: 10px 14px; font-size: 0.85rem; background: rgba(14, 165, 233, 0.15); border: 1px solid #38bdf8; color: #f0f9ff; border-radius: 10px;">
+          <span>▶</span>
+          <span>Escuchar sonido (Encender / Apagar)</span>
+        </button>
       </div>
 
       <div style="height: 1px; background: rgba(56, 189, 248, 0.15); margin: 14px 0;"></div>
@@ -177,6 +180,6 @@
     </aside>
   </main>
 
-  <script type="module" src="app.js?v=32"></script>
+  <script type="module" src="app.js?v=33"></script>
 </body>
 </html>

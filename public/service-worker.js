@@ -3,7 +3,7 @@
  * Network-first strategy to ensure instant updates during development.
  */
 
-const CACHE_NAME = 'gemini-live-v12';
+const CACHE_NAME = 'gemini-live-v13';
 
 self.addEventListener('install', (event) => {
   self.skipWaiting();
