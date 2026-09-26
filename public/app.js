@@ -5,7 +5,7 @@
  */
 
 import { GlowingOrb } from './orb.js?v=14';
-import { SoundManager } from './sound-effects.js?v=9';
+import { SoundManager } from './sound-effects.js?v=10';
 
 class VoiceApp {
   constructor() {
