@@ -19,7 +19,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600&display=swap" rel="stylesheet">
 
-  <link rel="stylesheet" href="styles.css?v=24">
+  <link rel="stylesheet" href="styles.css?v=25">
 </head>
 <body>
   <main id="app-container" data-state="idle" role="button" aria-label="Toca la pantalla para activar o desactivar la interfaz de voz" tabindex="0">
@@ -130,6 +130,25 @@
 
       <div style="height: 1px; background: rgba(56, 189, 248, 0.15); margin: 14px 0;"></div>
 
+      <!-- Earcons / Sonidos del Orbe -->
+      <div class="drawer-header">
+        <div style="display:flex; align-items:center; gap:8px;">
+          <span style="font-size:1.15rem;">🎵</span>
+          <h3 style="margin:0;">Sonidos del Orbe</h3>
+        </div>
+        <label class="sound-switch" title="Activar/Silenciar efectos de sonido">
+          <input type="checkbox" id="sound-effects-toggle" checked>
+          <span class="sound-slider"></span>
+        </label>
+      </div>
+      <p class="drawer-desc">Efectos de 1–2 seg al presionar el orbe para iniciar o apagar. Escucha cada opción y elige tu favorita:</p>
+
+      <div class="sound-presets-list" id="sound-presets-list">
+        <!-- Rendered dynamically by SoundManager in app.js -->
+      </div>
+
+      <div style="height: 1px; background: rgba(56, 189, 248, 0.15); margin: 14px 0;"></div>
+
       <div class="drawer-header">
         <h3>🌙 Modo Silencioso (TTS)</h3>
       </div>
@@ -158,6 +177,6 @@
     </aside>
   </main>
 
-  <script type="module" src="app.js?v=30"></script>
+  <script type="module" src="app.js?v=31"></script>
 </body>
 </html>

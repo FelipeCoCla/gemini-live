@@ -226,18 +226,21 @@ html, body {
   bottom: 0;
   right: 0;
   width: 100%;
-  max-width: 420px;
-  background: rgba(6, 14, 22, 0.9);
+  max-width: 440px;
+  max-height: 88vh;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  background: rgba(6, 14, 22, 0.94);
   backdrop-filter: blur(32px) saturate(200%);
   -webkit-backdrop-filter: blur(32px) saturate(200%);
   border-top-left-radius: 24px;
   border-top: 1px solid rgba(56, 189, 248, 0.16);
   border-left: 1px solid rgba(56, 189, 248, 0.16);
-  padding: 26px;
+  padding: 24px 22px 32px 22px;
   z-index: 100;
   transform: translateY(105%);
   transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1);
-  box-shadow: 0 -20px 60px rgba(0, 0, 0, 0.8);
+  box-shadow: 0 -20px 60px rgba(0, 0, 0, 0.85);
   cursor: default;
 }
 
@@ -333,6 +336,175 @@ html, body {
   filter: brightness(1.15);
   transform: translateY(-1px);
   box-shadow: 0 6px 20px rgba(56, 189, 248, 0.45);
+}
+
+/* Sound Switch Toggle */
+.sound-switch {
+  position: relative;
+  display: inline-block;
+  width: 44px;
+  height: 24px;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.sound-switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.sound-slider {
+  position: absolute;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background-color: rgba(100, 116, 139, 0.4);
+  border-radius: 24px;
+  transition: 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+}
+
+.sound-slider:before {
+  position: absolute;
+  content: "";
+  height: 18px;
+  width: 18px;
+  left: 2px;
+  bottom: 2px;
+  background-color: #ffffff;
+  border-radius: 50%;
+  transition: 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  box-shadow: 0 1px 4px rgba(0,0,0,0.4);
+}
+
+.sound-switch input:checked + .sound-slider {
+  background: linear-gradient(135deg, #0ea5e9, #0284c7);
+  box-shadow: 0 0 10px rgba(14, 165, 233, 0.5);
+  border-color: rgba(56, 189, 248, 0.5);
+}
+
+.sound-switch input:checked + .sound-slider:before {
+  transform: translateX(20px);
+}
+
+/* Sound Presets Container */
+.sound-presets-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.sound-card {
+  display: flex;
+  flex-direction: column;
+  background: rgba(15, 23, 42, 0.6);
+  border: 1px solid rgba(56, 189, 248, 0.12);
+  border-radius: 12px;
+  padding: 10px 12px;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.sound-card:hover {
+  border-color: rgba(56, 189, 248, 0.3);
+  background: rgba(15, 23, 42, 0.85);
+  transform: translateY(-1px);
+}
+
+.sound-card.is-active {
+  border-color: #38bdf8;
+  background: rgba(14, 165, 233, 0.12);
+  box-shadow: 0 0 16px rgba(56, 189, 248, 0.18), inset 0 0 12px rgba(14, 165, 233, 0.08);
+}
+
+.sound-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 3px;
+}
+
+.sound-card-title {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 0.86rem;
+  font-weight: 600;
+  color: #f1f5f9;
+}
+
+.sound-card-desc {
+  font-size: 0.74rem;
+  color: #94a3b8;
+  margin-bottom: 8px;
+  line-height: 1.35;
+}
+
+.sound-card-actions {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.sound-btn-audition {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: rgba(30, 41, 59, 0.85);
+  border: 1px solid rgba(56, 189, 248, 0.22);
+  color: #e2e8f0;
+  border-radius: 7px;
+  padding: 5px 9px;
+  font-size: 0.72rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  user-select: none;
+}
+
+.sound-btn-audition:hover {
+  background: rgba(56, 189, 248, 0.22);
+  color: #ffffff;
+  border-color: #38bdf8;
+  transform: scale(1.03);
+}
+
+.sound-btn-audition:active {
+  transform: scale(0.97);
+}
+
+.sound-btn-audition.btn-stop {
+  border-color: rgba(244, 63, 94, 0.3);
+}
+
+.sound-btn-audition.btn-stop:hover {
+  background: rgba(244, 63, 94, 0.22);
+  border-color: #f43f5e;
+  color: #fecdd3;
+}
+
+.sound-btn-select {
+  margin-left: auto;
+  background: rgba(15, 23, 42, 0.6);
+  border: 1px solid rgba(148, 163, 184, 0.3);
+  color: #94a3b8;
+  border-radius: 7px;
+  padding: 5px 11px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.sound-btn-select:hover {
+  border-color: #38bdf8;
+  color: #38bdf8;
+}
+
+.sound-card.is-active .sound-btn-select {
+  background: linear-gradient(135deg, #0284c7 0%, #0369a1 100%);
+  border-color: #38bdf8;
+  color: #ffffff;
+  box-shadow: 0 0 10px rgba(14, 165, 233, 0.4);
 }
 
 .drawer-info {
