@@ -23,7 +23,9 @@ export class SoundManager {
 
   getPresets() {
     return [
-      { id: 'gemini', name: 'Gemini Ambient', icon: '✨', desc: 'Acorde brillante y etéreo de 4 notas con reverb suave (Google AI)' },
+      { id: 'gemini', name: 'Dúo Cálido (Favorito)', icon: '⭐', desc: 'El sonido suave de dos notas que te gustó en OFF, idéntico al encender y apagar (0.6s)' },
+      { id: 'harmonic', name: 'Dúo Armónico', icon: '🎶', desc: 'Misma textura cálida: sube al encender (587➔880Hz) y baja al apagar (880➔587Hz)' },
+      { id: 'ambient', name: 'Gemini Acorde Swell', icon: '✨', desc: 'Acorde brillante etéreo de 4 notas con apertura de filtro (1.4s)' },
       { id: 'apple', name: 'Siri Minimal', icon: '🍎', desc: 'Chime clásico de dos notas ascendente / descendente (Apple)' },
       { id: 'marimba', name: 'Boutique Marimba', icon: '🪵', desc: 'Madera acústica y cálida estilo Notion / Linear' },
       { id: 'quantum', name: 'Quantum HUD', icon: '🛸', desc: 'Activación futurista con sweep armónico y cristal' },
@@ -60,10 +62,63 @@ export class SoundManager {
   }
 
   // ==========================================
-  // PRESET 1: Gemini Ambient (Google AI Style)
+  // PRESET 1: Dúo Cálido (The user's favorite OFF tone)
+  // Two warm sine tones with lowpass closing filter
   // ==========================================
+  playWarmTones(ctx, now, ascending = false) {
+    const masterGain = ctx.createGain();
+    masterGain.gain.setValueAtTime(0.18, now);
+    masterGain.connect(ctx.destination);
+
+    // Warm pair with soft LP filter sweep (the exact tone from OFF: 880Hz -> 587Hz)
+    const notes = ascending
+      ? [
+          { f: 587.33, delay: 0.00, dur: 0.6 },
+          { f: 880.00, delay: 0.08, dur: 0.7 }
+        ]
+      : [
+          { f: 880.00, delay: 0.00, dur: 0.6 },
+          { f: 587.33, delay: 0.08, dur: 0.7 }
+        ];
+
+    notes.forEach(({ f, delay, dur }) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      const filter = ctx.createBiquadFilter();
+
+      filter.type = 'lowpass';
+      filter.frequency.setValueAtTime(2200, now + delay);
+      filter.frequency.exponentialRampToValueAtTime(450, now + delay + dur);
+
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(f, now + delay);
+
+      gain.gain.setValueAtTime(0.0001, now + delay);
+      gain.gain.exponentialRampToValueAtTime(0.25, now + delay + 0.03);
+      gain.gain.exponentialRampToValueAtTime(0.0001, now + delay + dur);
+
+      osc.connect(filter);
+      filter.connect(gain);
+      gain.connect(masterGain);
+
+      osc.start(now + delay);
+      osc.stop(now + delay + dur + 0.05);
+    });
+  }
+
   playGeminiStart(ctx, now) {
-    // Beautiful airy D-major triad: D5 (587Hz), F#5 (740Hz), A5 (880Hz), shimmering D6 (1174Hz)
+    // Exact same sound as OFF: soothing, warm, two-tone
+    return this.playWarmTones(ctx, now, false);
+  }
+
+  playGeminiStop(ctx, now) {
+    return this.playWarmTones(ctx, now, false);
+  }
+
+  // ==========================================
+  // PRESET: Ambient 4-note Swell (Google AI)
+  // ==========================================
+  playAmbientSwell(ctx, now) {
     const masterGain = ctx.createGain();
     masterGain.gain.setValueAtTime(0.22, now);
     masterGain.connect(ctx.destination);
@@ -88,45 +143,8 @@ export class SoundManager {
       osc.type = type;
       osc.frequency.setValueAtTime(f, now + delay);
 
-      // Gentle curved attack to avoid click
       gain.gain.setValueAtTime(0.0001, now + delay);
       gain.gain.exponentialRampToValueAtTime(0.28, now + delay + 0.04);
-      gain.gain.exponentialRampToValueAtTime(0.0001, now + delay + dur);
-
-      osc.connect(filter);
-      filter.connect(gain);
-      gain.connect(masterGain);
-
-      osc.start(now + delay);
-      osc.stop(now + delay + dur + 0.05);
-    });
-  }
-
-  playGeminiStop(ctx, now) {
-    const masterGain = ctx.createGain();
-    masterGain.gain.setValueAtTime(0.18, now);
-    masterGain.connect(ctx.destination);
-
-    // Warm descending pair with soft LP filter sweep
-    const notes = [
-      { f: 880.00, delay: 0.00, dur: 0.6 },
-      { f: 587.33, delay: 0.08, dur: 0.7 }
-    ];
-
-    notes.forEach(({ f, delay, dur }) => {
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-      const filter = ctx.createBiquadFilter();
-
-      filter.type = 'lowpass';
-      filter.frequency.setValueAtTime(2200, now + delay);
-      filter.frequency.exponentialRampToValueAtTime(450, now + delay + dur);
-
-      osc.type = 'sine';
-      osc.frequency.setValueAtTime(f, now + delay);
-
-      gain.gain.setValueAtTime(0.0001, now + delay);
-      gain.gain.exponentialRampToValueAtTime(0.25, now + delay + 0.03);
       gain.gain.exponentialRampToValueAtTime(0.0001, now + delay + dur);
 
       osc.connect(filter);
@@ -394,12 +412,15 @@ export class SoundManager {
   playStartSound(ctx, preset) {
     const now = ctx.currentTime;
     switch (preset) {
+      case 'harmonic': return this.playWarmTones(ctx, now, true); // Ascending pair
+      case 'ambient': return this.playAmbientSwell(ctx, now);      // 4-note swell
       case 'apple': return this.playAppleStart(ctx, now);
       case 'marimba': return this.playMarimbaStart(ctx, now);
       case 'quantum': return this.playQuantumStart(ctx, now);
       case 'zen': return this.playZenStart(ctx, now);
       case 'gemini':
       default:
+        // Default: exact same sound from OFF that the user loved!
         return this.playGeminiStart(ctx, now);
     }
   }
@@ -407,12 +428,15 @@ export class SoundManager {
   playStopSound(ctx, preset) {
     const now = ctx.currentTime;
     switch (preset) {
+      case 'harmonic': return this.playWarmTones(ctx, now, false); // Descending pair
+      case 'ambient': return this.playWarmTones(ctx, now, false);
       case 'apple': return this.playAppleStop(ctx, now);
       case 'marimba': return this.playMarimbaStop(ctx, now);
       case 'quantum': return this.playQuantumStop(ctx, now);
       case 'zen': return this.playZenStop(ctx, now);
       case 'gemini':
       default:
+        // Default: exact same sound from OFF that the user loved!
         return this.playGeminiStop(ctx, now);
     }
   }
