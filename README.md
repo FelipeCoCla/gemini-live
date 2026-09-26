@@ -13,8 +13,7 @@ Progressive Web App (PWA) minimalista y manos libres que funciona como canal de 
 - **Orbe Reactivo en Tiempo Real:** Renderizado fluido mediante Canvas con estados visuales claros (*Desconectado*, *Escuchando*, *Pensando*, *Hablando*).
 - **Audio Bidireccional de Baja Latencia:** Captura PCM lineal a 16 kHz mediante `AudioWorklet` y reproducción PCM a 24 kHz continua y sin chasquidos.
 - **Interfaz estilo WhatsApp:** Conversación fluida con diseño dark moderno en Obsidian/Cyan, burbujas de diálogo y transcripciones sincronizadas.
-- **Cancelación y Filtro Anti-Eco Multi-Capa:** Evita que el audio emitido por los altavoces de Gemini se retroalimente como voz del usuario.
-- **Soporte Móvil (Android / iOS):** Servidor Polyglot HTTPS/TLS en puerto 3443 para cumplir con las políticas de seguridad de micrófono del navegador móvil.
+- **Soporte Móvil (Android / iOS):** PWA instalable con diseño adaptativo y audio WebRTC/WebAudio de baja latencia.
 - **Human-in-the-Loop & Tool Calling:** Herramienta `send_to_orchestrator` integrada para delegar tareas técnicas complejas a Hermes e inyectar turnos vocales proactivos de clarificación.
 
 ---
@@ -64,7 +63,7 @@ npm start
 
 ### 4. Acceder a la Interfaz
 - **Desktop (Localhost):** [http://localhost:4040](http://localhost:4040)
-- **Dispositivos Móviles (Misma Red Wi-Fi):** `https://<TU_IP_LOCAL>:3443` *(Requiere aceptar certificado SSL auto-firmado)*
+- **Producción:** [https://voice.bolidus.xyz](https://voice.bolidus.xyz)
 
 ---
 
@@ -77,13 +76,14 @@ gemini-live/
 │   ├── styles.css                # Estilos Obsidian/Cyan y diseño responsive
 │   ├── app.js                    # Web Audio API, WebSocket client y lógica UI
 │   ├── orb.js                    # Motor gráfico del orbe
+│   ├── sound-effects.js          # Síntesis procedural de efectos de sonido (Zen Bell)
 │   ├── audio-recorder-worklet.js # Procesamiento de audio en tiempo real
+│   ├── service-worker.js         # Cache y capacidades PWA offline
 │   └── manifest.json             # Manifiesto PWA para instalación móvil
 ├── server/                       # Backend Gateway & Orquestador
-│   ├── server.mjs                # Servidor dual HTTP/HTTPS y WebSocket
+│   ├── server.mjs                # Servidor HTTP y WebSocket
 │   ├── gemini-live.mjs           # Sesión bidireccional con Gemini 3.8 Live
 │   └── orchestrator.mjs          # Conexión con Hermes
-├── recordings/                   # Almacenamiento local de grabaciones de prueba
 ├── PROYECTO_ESTADO_Y_ARQUITECTURA.md # Bitácora técnica y arquitectura
 └── package.json
 ```

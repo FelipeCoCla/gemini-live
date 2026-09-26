@@ -78,14 +78,8 @@ class VoiceApp {
   checkEnvironment() {
     const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
     const isMicAvailable = Boolean(navigator.mediaDevices && navigator.mediaDevices.getUserMedia);
-    const banner = document.getElementById('https-banner');
-    const switchBtn = document.getElementById('btn-orb-switch-https');
-
     if (!isMicAvailable && !isLocal && window.location.protocol === 'http:') {
-      if (banner && switchBtn) {
-        banner.style.display = 'block';
-        switchBtn.href = `https://${window.location.hostname}:3443${window.location.pathname}${window.location.search}`;
-      }
+      console.warn('[Environment] Insecure HTTP origin. Microphone requires HTTPS in mobile browsers.');
     }
   }
 
@@ -106,7 +100,6 @@ class VoiceApp {
       if (touchMoved) return;
       if (e.target.closest('#debug-drawer') || 
           e.target.closest('#debug-trigger') || 
-          e.target.closest('#https-banner') ||
           e.target.closest('#conversation-panel')) {
         return;
       }
@@ -827,20 +820,11 @@ class VoiceApp {
     this.chunksSent = 0;
 
     // Check if browser environment supports microphone
-    const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
     if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
       this.isConnecting = false;
       const errMsg = "Micrófono bloqueado (requiere HTTPS)";
       this.setStatus(errMsg, "idle");
-      if (!isLocal && window.location.protocol === 'http:') {
-        const httpsUrl = `https://${window.location.hostname}:3443${window.location.pathname}${window.location.search}`;
-        if (confirm('⚠️ Tu navegador móvil (Chrome/Safari) bloquea el micrófono por HTTP.\n\n¿Deseas cambiar ahora a la versión segura HTTPS en el puerto 3443?')) {
-          window.location.href = httpsUrl;
-          return;
-        }
-      } else {
-        alert('Tu navegador no permite acceso al micrófono en este modo. En celulares accede vía HTTPS: https://' + window.location.hostname + ':3443');
-      }
+      alert('Tu navegador no permite acceso al micrófono en este modo. En dispositivos móviles se requiere ingresar mediante conexión segura HTTPS.');
       return;
     }
 

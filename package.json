@@ -6,7 +6,8 @@
   "main": "server/server.mjs",
   "scripts": {
     "start": "node server/server.mjs",
-    "dev": "node --watch server/server.mjs"
+    "dev": "node --watch server/server.mjs",
+    "build": "node --check server/server.mjs && node --check server/gemini-live.mjs && node --check server/orchestrator.mjs && node --check public/app.js && node --check public/orb.js && node --check public/service-worker.js && node --check public/sound-effects.js"
   },
   "dependencies": {
     "dotenv": "^16.4.7",

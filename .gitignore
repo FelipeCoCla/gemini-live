@@ -4,8 +4,4 @@ node_modules/
 .DS_Store
 **/.DS_Store
 *.log
-server/*.pem
-*.pem
-recordings/*.wav
 *.wav
-!recordings/.gitkeep

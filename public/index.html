@@ -23,15 +23,6 @@
 </head>
 <body>
   <main id="app-container" data-state="idle" role="button" aria-label="Toca la pantalla para activar o desactivar la interfaz de voz" tabindex="0">
-    <!-- Insecure Context Notice for Mobile HTTP -->
-    <aside id="https-banner" class="https-mobile-notice" style="display: none;">
-      <div class="notice-content">
-        <span class="notice-icon">🔒</span>
-        <span class="notice-text">Micrófono requiere HTTPS en móvil.</span>
-        <a id="btn-orb-switch-https" href="#" class="notice-action">Usar HTTPS</a>
-      </div>
-    </aside>
-
     <!-- Centered Siri / Gemini Canvas Orb -->
     <div class="orb-wrapper" id="orb-wrapper">
       <canvas id="orb-canvas"></canvas>
@@ -121,15 +112,6 @@
         <button id="close-drawer" class="icon-close-btn" aria-label="Cerrar panel">&times;</button>
       </div>
 
-      <div style="margin: 10px 0 16px 0;">
-        <a href="/grabar" style="text-decoration:none; text-align:center; display:flex; align-items:center; justify-content:center; gap:8px; background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%); color:#fff; font-weight:600; padding:12px 14px; border-radius:10px; font-size:0.9rem; box-shadow:0 4px 14px rgba(239,68,68,0.3);">
-          <span>🎙️</span>
-          <span>Diagnóstico de Micrófono & Voz Real</span>
-        </a>
-      </div>
-
-      <div style="height: 1px; background: rgba(56, 189, 248, 0.15); margin: 14px 0;"></div>
-
       <!-- Earcons / Sonidos del Orbe -->
       <div class="drawer-header">
         <div style="display:flex; align-items:center; gap:8px;">
@@ -177,6 +159,6 @@
     </aside>
   </main>
 
-  <script type="module" src="app.js?v=39"></script>
+  <script type="module" src="app.js?v=40"></script>
 </body>
 </html>

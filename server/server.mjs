@@ -4,8 +4,6 @@
  */
 
 import http from 'http';
-import https from 'https';
-import net from 'net';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -19,10 +17,6 @@ dotenv.config();
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const PUBLIC_DIR = path.join(__dirname, '..', 'public');
-const RECORDINGS_DIR = path.join(__dirname, '..', 'recordings');
-if (!fs.existsSync(RECORDINGS_DIR)) {
-  fs.mkdirSync(RECORDINGS_DIR, { recursive: true });
-}
 const PORT = process.env.PORT || 4040;
 
 const MIME_TYPES = {
@@ -142,141 +136,8 @@ const requestHandler = async (req, res) => {
     return;
   }
 
-  // List all saved user recordings
-  if (url.pathname === '/api/recordings' && req.method === 'GET') {
-    try {
-      const files = fs.readdirSync(RECORDINGS_DIR).filter(f => f.endsWith('.wav'));
-      const items = files.map(filename => {
-        const fullPath = path.join(RECORDINGS_DIR, filename);
-        const stats = fs.statSync(fullPath);
-        return {
-          filename,
-          url: `/recordings/${filename}`,
-          sizeBytes: stats.size,
-          durationSec: Math.max(0, ((stats.size - 44) / 32000)).toFixed(2),
-          createdAt: stats.mtime
-        };
-      }).sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
-
-      res.writeHead(200, { 'Content-Type': 'application/json' });
-      return res.end(JSON.stringify({ recordings: items }));
-    } catch (e) {
-      res.writeHead(500, { 'Content-Type': 'application/json' });
-      return res.end(JSON.stringify({ error: e.message }));
-    }
-  }
-
-  // Save new user voice recording with auto-STT transcription
-  if (url.pathname === '/api/save-recording' && req.method === 'POST') {
-    let body = '';
-    req.on('data', chunk => { body += chunk; });
-    req.on('end', async () => {
-      try {
-        const { base64Wav, title } = JSON.parse(body || '{}');
-        if (!base64Wav) {
-          res.writeHead(400, { 'Content-Type': 'application/json' });
-          return res.end(JSON.stringify({ error: 'Falta base64Wav' }));
-        }
-
-        const count = fs.readdirSync(RECORDINGS_DIR).filter(f => f.endsWith('.wav')).length + 1;
-        const safeTitle = (title || `audio_${count}`).trim().replace(/[^a-zA-Z0-9_-]/g, '_').toLowerCase();
-        const filename = `grabacion_${count}_${safeTitle}.wav`;
-        const savePath = path.join(RECORDINGS_DIR, filename);
-        const buf = Buffer.from(base64Wav, 'base64');
-        fs.writeFileSync(savePath, buf);
-        // Also keep /tmp/user_real_voice.wav updated for CLI scripts
-        fs.writeFileSync('/tmp/user_real_voice.wav', buf);
-
-        console.log(`[Gateway] 💾 Saved recording #${count} to ${savePath} (${buf.length} bytes)`);
-
-        // Fast background transcription using gemini-3.5-flash to get ground-truth text
-        let transcript = '';
-        try {
-          const sttRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent?key=${process.env.GEMINI_API_KEY}`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              contents: [{
-                parts: [
-                  { text: 'Transcribe exactamente en español palabra por palabra lo que dice el usuario en este audio. Devuelve SOLO el texto transcrito:' },
-                  { inlineData: { mimeType: 'audio/wav', data: base64Wav } }
-                ]
-              }]
-            })
-          });
-          const sttData = await sttRes.json();
-          transcript = sttData?.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || '';
-          console.log(`[Gateway] 📝 STT transcript for ${filename}: "${transcript}"`);
-        } catch (sttErr) {
-          console.warn('[Gateway] STT background error:', sttErr.message);
-        }
-
-        res.writeHead(200, { 'Content-Type': 'application/json' });
-        return res.end(JSON.stringify({
-          success: true,
-          filename,
-          url: `/recordings/${filename}`,
-          transcript,
-          bytes: buf.length,
-          durationSec: Math.max(0, ((buf.length - 44) / 32000)).toFixed(2)
-        }));
-      } catch (err) {
-        res.writeHead(500, { 'Content-Type': 'application/json' });
-        return res.end(JSON.stringify({ error: err.message }));
-      }
-    });
-    return;
-  }
-
-  // Delete recording endpoint
-  if (url.pathname === '/api/delete-recording' && req.method === 'POST') {
-    let body = '';
-    req.on('data', chunk => { body += chunk; });
-    req.on('end', () => {
-      try {
-        const { filename } = JSON.parse(body || '{}');
-        const safeName = path.basename(filename || '');
-        const targetPath = path.join(RECORDINGS_DIR, safeName);
-        if (fs.existsSync(targetPath)) {
-          fs.unlinkSync(targetPath);
-          console.log(`[Gateway] 🗑️ Deleted recording ${safeName}`);
-          res.writeHead(200, { 'Content-Type': 'application/json' });
-          return res.end(JSON.stringify({ success: true }));
-        } else {
-          res.writeHead(404, { 'Content-Type': 'application/json' });
-          return res.end(JSON.stringify({ error: 'Archivo no encontrado' }));
-        }
-      } catch (e) {
-        res.writeHead(500, { 'Content-Type': 'application/json' });
-        return res.end(JSON.stringify({ error: e.message }));
-      }
-    });
-    return;
-  }
-
-  // Static serving for saved recordings
-  if (url.pathname.startsWith('/recordings/')) {
-    const filename = path.basename(url.pathname);
-    const audioPath = path.join(RECORDINGS_DIR, filename);
-    if (fs.existsSync(audioPath)) {
-      res.writeHead(200, {
-        'Content-Type': 'audio/wav',
-        'Cache-Control': 'no-cache'
-      });
-      return fs.createReadStream(audioPath).pipe(res);
-    } else {
-      res.writeHead(404);
-      return res.end('Audio no encontrado');
-    }
-  }
-
-  // Rewrite friendly URLs for recording test page
-  let reqPath = url.pathname;
-  if (reqPath === '/grabar' || reqPath === '/recorder' || reqPath === '/test' || reqPath === '/voice') {
-    reqPath = '/recorder.html';
-  }
-
   // Static File Serving
+  const reqPath = url.pathname;
   let filePath = path.join(PUBLIC_DIR, reqPath === '/' ? 'index.html' : reqPath);
 
   // Security check: ensure path is within PUBLIC_DIR
@@ -313,80 +174,6 @@ const requestHandler = async (req, res) => {
 
 // Create HTTP Server
 const server = http.createServer(requestHandler);
-
-// Create HTTPS Server (for Mobile Chrome/Safari mic access)
-const HTTPS_PORT = process.env.HTTPS_PORT || 3443;
-let httpsServer = null;
-let polyglotServer = null;
-const keyPath = path.join(__dirname, 'key.pem');
-const certPath = path.join(__dirname, 'cert.pem');
-if (fs.existsSync(keyPath) && fs.existsSync(certPath)) {
-  try {
-    httpsServer = https.createServer({
-      key: fs.readFileSync(keyPath),
-      cert: fs.readFileSync(certPath)
-    }, requestHandler);
-
-    httpsServer.on('tlsClientError', (err, socket) => {
-      console.warn(`[HTTPS] ⚠️ TLS Client Error from ${socket?.remoteAddress}: ${err.message}`);
-    });
-
-    httpsServer.on('clientError', (err, socket) => {
-      console.warn(`[HTTPS] ⚠️ Client Error from ${socket?.remoteAddress}: ${err.message}`);
-    });
-
-    // HTTP redirect fallback server for port 3443
-    // Handles clients that type 192.168.31.191:3443 without https://
-    const httpFallbackServer = http.createServer((req, res) => {
-      const host = req.headers.host || `192.168.31.191:${HTTPS_PORT}`;
-      const targetHttps = `https://${host}${req.url}`;
-      console.log(`[Port ${HTTPS_PORT}] 🔄 Client used plain HTTP. Redirecting to ${targetHttps}`);
-
-      res.writeHead(200, { 'Content-Type': 'text/html; charset=UTF-8' });
-      res.end(`<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Cambiando a HTTPS Seguro...</title>
-  <style>
-    body { background: #07090e; color: #fff; font-family: -apple-system, sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; margin: 0; text-align: center; padding: 24px; box-sizing: border-box; }
-    h2 { font-size: 1.3rem; margin-bottom: 8px; color: #38bdf8; }
-    p { color: #94a3b8; font-size: 0.95rem; line-height: 1.5; margin-bottom: 24px; }
-    a { background: linear-gradient(135deg, #00e5ff 0%, #0284c7 100%); color: #040608; padding: 14px 28px; border-radius: 99px; text-decoration: none; font-weight: 700; font-size: 1rem; box-shadow: 0 4px 20px rgba(0, 229, 255, 0.4); display: inline-block; }
-  </style>
-</head>
-<body>
-  <h2>🔒 Conexión Segura (HTTPS)</h2>
-  <p>Para activar el micrófono en el celular debes usar HTTPS.<br>Pulsa el botón para continuar:</p>
-  <a href="${targetHttps}">👉 Entrar con HTTPS Seguro</a>
-  <script>window.location.replace("${targetHttps}");</script>
-</body>
-</html>`);
-    });
-
-    // Polyglot TCP router on port 3443
-    // Inspects first byte: 0x16 = TLS Handshake, else = plain HTTP
-    polyglotServer = net.createServer((socket) => {
-      socket.once('data', (buf) => {
-        socket.pause();
-        socket.unshift(buf);
-        if (buf.length > 0 && buf[0] === 0x16) {
-          httpsServer.emit('connection', socket);
-        } else {
-          httpFallbackServer.emit('connection', socket);
-        }
-        process.nextTick(() => socket.resume());
-      });
-
-      socket.on('error', () => {});
-    });
-
-    console.log('[Gateway] 🔒 Polyglot HTTP/HTTPS Server initialized on port 3443');
-  } catch (err) {
-    console.warn('[Gateway] ⚠️ Failed initializing HTTPS server:', err.message);
-  }
-}
 
 // Function to handle client WebSocket connection
 function handleWsConnection(clientWs, req) {
@@ -786,32 +573,16 @@ async function transcribeAudioAsync(wavBuffer) {
 }
 
 // Attach WebSocketServer to HTTP server
-const wssHttp = new WebSocketServer({ server, path: '/ws' });
-wssHttp.on('connection', handleWsConnection);
-
-// Attach WebSocketServer to HTTPS server
-if (httpsServer) {
-  const wssHttps = new WebSocketServer({ server: httpsServer, path: '/ws' });
-  wssHttps.on('connection', handleWsConnection);
-}
+const wss = new WebSocketServer({ server, path: '/ws' });
+wss.on('connection', handleWsConnection);
 
 server.listen(PORT, '0.0.0.0', () => {
   console.log(`\n======================================================`);
   console.log(`🎙️  Gemini 3.8 Live + Hermes Bridge Gateway Online!`);
   console.log(`📍 Web PWA (Local):     http://localhost:${PORT}`);
-  console.log(`📱 Celular (LAN HTTP):  http://192.168.31.191:${PORT}`);
-  if (httpsServer) {
-    console.log(`🔒 Celular (LAN HTTPS): https://192.168.31.191:${HTTPS_PORT}`);
-    console.log(`🎙️ Celular (Grabar):    https://192.168.31.191:${HTTPS_PORT}/grabar`);
-  }
+  console.log(`📱 Celular (LAN):       http://192.168.31.191:${PORT}`);
   console.log(`🤖 Model:               ${process.env.GEMINI_MODEL || 'models/gemini-3.8-live'}`);
   console.log(`🔊 Voice:               ${process.env.GEMINI_VOICE || 'Aoede'}`);
   console.log(`🛡️  Hermes:              ${process.env.HERMES_API_URL || 'http://192.168.31.20:8642/v1/chat/completions'}`);
   console.log(`======================================================\n`);
 });
-
-if (polyglotServer) {
-  polyglotServer.listen(HTTPS_PORT, '0.0.0.0', () => {
-    console.log(`🔒 Polyglot HTTPS Gateway listening on port ${HTTPS_PORT} (0.0.0.0)`);
-  });
-}
