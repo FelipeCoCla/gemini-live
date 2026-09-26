@@ -7,6 +7,10 @@
 export class SoundManager {
   constructor(getAudioContext) {
     this.getAudioContext = getAudioContext;
+    if (!localStorage.getItem('gemini_sound_v3_selected')) {
+      localStorage.setItem('gemini_sound_preset', 'zen_original');
+      localStorage.setItem('gemini_sound_v3_selected', '1');
+    }
     this.currentPreset = localStorage.getItem('gemini_sound_preset') || 'zen_original';
     this.isEnabled = localStorage.getItem('gemini_sound_enabled') !== 'false';
   }
@@ -25,9 +29,15 @@ export class SoundManager {
     return [
       {
         id: 'zen_original',
-        name: 'Zen 1: Base Original (E4 Fijo)',
+        name: 'Zen Bell (ON: 329Hz / OFF: 220Hz Zen 4)',
         icon: '🔔',
-        desc: 'El tono exacto de cuenco en 329Hz que te gustó, idéntico tanto al encender como al apagar (0.8s).'
+        desc: 'Tu combinación elegida: encendido suave en Mi4 (329Hz) y apagado profundo con La3 grave de Zen 4 (220Hz).'
+      },
+      {
+        id: 'zen_pure',
+        name: 'Zen Base Fijo (E4 329Hz ambos)',
+        icon: '🧘',
+        desc: 'El cuenco original en 329Hz idéntico tanto al encender como al apagar (0.8s).'
       },
       {
         id: 'zen_harmonic',
@@ -127,12 +137,23 @@ export class SoundManager {
   }
 
   // ==========================================
-  // 1. ZEN ORIGINAL (Base que le gustó, E4 fijo)
+  // 1. ZEN ELEGIDO (ON: 329Hz Base / OFF: 220Hz Zen 4)
   // ==========================================
   playZenOriginalStart(ctx, now) {
     this.playBowlTone(ctx, now, 329.63, 0.8, 0.25, 0, 0.16);
   }
   playZenOriginalStop(ctx, now) {
+    // Exacto Zen 4 OFF: La3 grave (220Hz), 1.05s, 0.28 peak, 0.18 vol
+    this.playBowlTone(ctx, now, 220.00, 1.05, 0.28, 0, 0.18);
+  }
+
+  // ==========================================
+  // ZEN BASE FIJO (E4 329Hz en ambos)
+  // ==========================================
+  playZenPureStart(ctx, now) {
+    this.playBowlTone(ctx, now, 329.63, 0.8, 0.25, 0, 0.16);
+  }
+  playZenPureStop(ctx, now) {
     this.playBowlTone(ctx, now, 329.63, 0.8, 0.25, 0, 0.16);
   }
 
@@ -310,6 +331,7 @@ export class SoundManager {
   playStartSound(ctx, preset) {
     const now = ctx.currentTime;
     switch (preset) {
+      case 'zen_pure': return this.playZenPureStart(ctx, now);
       case 'zen_harmonic': return this.playZenHarmonicStart(ctx, now);
       case 'zen_duo': return this.playZenDuoStart(ctx, now);
       case 'zen_deep': return this.playZenDeepStart(ctx, now);
@@ -327,6 +349,7 @@ export class SoundManager {
   playStopSound(ctx, preset) {
     const now = ctx.currentTime;
     switch (preset) {
+      case 'zen_pure': return this.playZenPureStop(ctx, now);
       case 'zen_harmonic': return this.playZenHarmonicStop(ctx, now);
       case 'zen_duo': return this.playZenDuoStop(ctx, now);
       case 'zen_deep': return this.playZenDeepStop(ctx, now);
