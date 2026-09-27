@@ -3,7 +3,7 @@
   "name": "Gemini Live • Voice Interface",
   "short_name": "Gemini Live",
   "description": "Minimalist hands-free Voice Interface with Gemini 3.8 Live & Hermes Orchestrator",
-  "start_url": "/",
+  "start_url": "/?auto=true",
   "scope": "/",
   "display": "standalone",
   "orientation": "portrait-primary",
