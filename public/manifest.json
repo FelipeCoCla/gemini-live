@@ -1,8 +1,8 @@
 {
   "id": "/",
-  "name": "Gemini Live • Voice Interface",
-  "short_name": "Gemini Live",
-  "description": "Minimalist hands-free Voice Interface with Gemini 3.8 Live & Hermes Orchestrator",
+  "name": "Mi Agente",
+  "short_name": "Mi Agente",
+  "description": "Interfaz de voz manos libres con Gemini 3.8 Live y orquestador Hermes",
   "start_url": "/?auto=true",
   "scope": "/",
   "display": "standalone",
