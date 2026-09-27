@@ -165,6 +165,13 @@ const requestHandler = async (req, res) => {
     if (filePath.endsWith('service-worker.js')) {
       headers['Service-Worker-Allowed'] = '/';
     }
+    if (filePath.endsWith('manifest.json')) {
+      headers['Content-Type'] = 'application/manifest+json; charset=UTF-8';
+      headers['Access-Control-Allow-Origin'] = '*';
+    }
+    if (filePath.includes(path.sep + 'icons' + path.sep)) {
+      headers['Access-Control-Allow-Origin'] = '*';
+    }
 
     res.writeHead(200, headers);
     const stream = fs.createReadStream(filePath);
